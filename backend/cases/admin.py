@@ -1,0 +1,45 @@
+from django.contrib import admin
+from .models import Case, SightingReport
+
+
+@admin.register(Case)
+class CaseAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "vehicle",
+        "reporter",
+        "status",
+        "police_station",
+        "police_case_number",
+        "incident_date",
+        "created_at",
+        "allow_public_contact",
+    )
+    list_filter = ("status", "police_station", "incident_date", "created_at")
+    search_fields = (
+        "vehicle__plate_number",
+        "vehicle__vin",
+        "vehicle__engine_number",
+        "police_case_number",
+        "reporter__username",
+        "reporter__email",
+    )
+
+@admin.register(SightingReport)
+class SightingReportAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "case",
+        "reporter_name",
+        "location",
+        "contact_revealed",
+        "created_at",
+    )
+    list_filter = ("contact_revealed", "created_at")
+    search_fields = (
+        "case__id",
+        "reporter_name",
+        "reporter_phone",
+        "reporter_email",
+        "location",
+    )
