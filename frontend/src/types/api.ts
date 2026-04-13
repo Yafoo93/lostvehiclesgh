@@ -70,3 +70,39 @@ export type LoginResponse = {
   refresh: string;
   user: AuthUser;
 };
+
+export type PaginatedResponse<T> = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+};
+
+export type VehicleRecord = {
+  id: number;
+  owner: number;
+  plate_number: string;
+  vin: string | null;
+  engine_number: string | null;
+  make: string;
+  model: string;
+  year: number | null;
+  color: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CaseRecord = {
+  id: number;
+  vehicle: number;
+  reporter: number;
+  status: "PENDING" | "VERIFIED_STOLEN" | "REJECTED" | "RECOVERED";
+  police_station: string;
+  police_case_number: string;
+  incident_date: string;
+  last_seen_location_text: string | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  allow_public_contact: boolean;
+};
