@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createCase, fetchMyVehicles } from "@/lib/dashboard";
+import { createCase, fetchMyVehicles, uploadCaseDocument } from "@/lib/dashboard";
 import type { VehicleRecord } from "@/types/api";
 import styles from "./page.module.css";
 
@@ -18,11 +18,14 @@ export default function NewCasePage() {
   const [lastSeenLocation, setLastSeenLocation] = useState("");
   const [description, setDescription] = useState("");
   const [allowPublicContact, setAllowPublicContact] = useState(false);
+  const [policeExtractFile, setPoliceExtractFile] = useState<File | null>(null);
+  const [vehiclePhotos, setVehiclePhotos] = useState<File[]>([]);
 
   const [loadingVehicles, setLoadingVehicles] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  
 
   useEffect(() => {
     let isMounted = true;
@@ -61,10 +64,15 @@ export default function NewCasePage() {
       return;
     }
 
+    if (!policeExtractFile) {
+      setError("Police extract is required for case submission.");
+      return;
+    }
+
     try {
       setLoading(true);
 
-      await createCase({
+      const createdCase = await createCase({
         vehicle_id: Number(vehicleId),
         police_station: policeStation.trim(),
         police_case_number: policeCaseNumber.trim(),
@@ -74,11 +82,27 @@ export default function NewCasePage() {
         allow_public_contact: allowPublicContact,
       });
 
-      setSuccessMessage("Case submitted successfully. Redirecting to dashboard...");
+      await uploadCaseDocument({
+        caseId: createdCase.id,
+        docType: "POLICE_EXTRACT",
+        file: policeExtractFile,
+      });
 
+      for (const photo of vehiclePhotos) {
+        await uploadCaseDocument({
+          caseId: createdCase.id,
+          docType: "VEHICLE_PHOTO",
+          file: photo,
+        });
+      }
+
+      setSuccessMessage(
+        "Case submitted successfully with police extract and any selected vehicle pictures. Redirecting to dashboard..."
+      );
+      setVehiclePhotos([]);
       setTimeout(() => {
         router.push("/dashboard");
-      }, 1000);
+      }, 1200);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create case.");
     } finally {
@@ -90,7 +114,7 @@ export default function NewCasePage() {
     <section className={styles.page}>
       <h2 className={styles.title}>Report Missing / Stolen Vehicle</h2>
       <p className={styles.text}>
-        Create a case for one of your vehicles. It will be submitted for review.
+        Create a case for one of your vehicles and upload the police extract.
       </p>
 
       <form onSubmit={handleSubmit} className={styles.form}>
@@ -182,6 +206,47 @@ export default function NewCasePage() {
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Describe how the vehicle went missing"
           />
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="police_extract" className={styles.label}>
+            Police Extract
+          </label>
+          <input
+            id="police_extract"
+            type="file"
+            className={styles.fileInput}
+            accept=".pdf,.jpg,.jpeg,.png"
+            onChange={(e) => setPoliceExtractFile(e.target.files?.[0] || null)}
+          />
+          <p className={styles.helperText}>
+            Upload the official police extract as PDF, JPG, or PNG.
+          </p>
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="vehicle_photos" className={styles.label}>
+            Vehicle Pictures (Optional)
+          </label>
+          <input
+            id="vehicle_photos"
+            type="file"
+            className={styles.fileInput}
+            accept=".jpg,.jpeg,.png"
+            multiple
+            onChange={(e) =>
+              setVehiclePhotos(e.target.files ? Array.from(e.target.files) : [])
+            }
+          />
+          <p className={styles.helperText}>
+            Optional: upload clear pictures of the vehicle to support the report.
+          </p>
+
+          {vehiclePhotos.length > 0 ? (
+            <p className={styles.helperText}>
+              {vehiclePhotos.length} vehicle picture(s) selected.
+            </p>
+          ) : null}
         </div>
 
         <div className={styles.checkboxRow}>

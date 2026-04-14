@@ -110,3 +110,16 @@
     grid-template-columns: 1fr;
   }
 }
+
+.fileInput {
+  width: 100%;
+  padding: 10px 0;
+  color: #111827;
+}
+
+.helperText {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #6b7280;
+  line-height: 1.5;
+}

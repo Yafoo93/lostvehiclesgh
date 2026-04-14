@@ -132,6 +132,10 @@ export async function createVehicle(payload: {
   return data;
 }
 
+type CreatedCaseResponse = {
+  id: number;
+};
+
 export async function createCase(payload: {
   vehicle_id: number;
   police_station: string;
@@ -140,7 +144,7 @@ export async function createCase(payload: {
   last_seen_location_text?: string;
   description?: string;
   allow_public_contact?: boolean;
-}) {
+}): Promise<CreatedCaseResponse> {
   const response = await fetch(`${API_BASE_URL}/cases/`, {
     method: "POST",
     headers: {
@@ -154,6 +158,44 @@ export async function createCase(payload: {
 
   if (!response.ok) {
     throw new Error(getErrorMessage(data, "Failed to create case."));
+  }
+
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("id" in data) ||
+    typeof (data as { id?: unknown }).id !== "number"
+  ) {
+    throw new Error("Unexpected case creation response format.");
+  }
+
+  return {
+    id: (data as { id: number }).id,
+  };
+}
+
+export async function uploadCaseDocument(payload: {
+  caseId: number;
+  docType: "POLICE_EXTRACT" | "VEHICLE_PHOTO";
+  file: File;
+}) {
+  const formData = new FormData();
+  formData.append("doc_type", payload.docType);
+  formData.append("file", payload.file);
+
+  const response = await fetch(
+    `${API_BASE_URL}/cases/${payload.caseId}/documents/`,
+    {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: formData,
+    }
+  );
+
+  const data: unknown = await response.json();
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(data, "Failed to upload document."));
   }
 
   return data;
