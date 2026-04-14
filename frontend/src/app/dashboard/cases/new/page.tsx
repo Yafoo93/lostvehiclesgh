@@ -207,7 +207,7 @@ export default function NewCasePage() {
             placeholder="Describe how the vehicle went missing"
           />
         </div>
-
+      <div className={styles.uploadRow}>
         <div className={styles.field}>
           <label htmlFor="police_extract" className={styles.label}>
             Police Extract
@@ -248,7 +248,8 @@ export default function NewCasePage() {
             </p>
           ) : null}
         </div>
-
+      </div>
+      
         <div className={styles.checkboxRow}>
           <input
             id="allow_public_contact"

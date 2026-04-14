@@ -106,7 +106,8 @@
 }
 
 @media (max-width: 640px) {
-  .row {
+  .row,
+  .uploadRow {
     grid-template-columns: 1fr;
   }
 }
@@ -122,4 +123,10 @@
   font-size: 0.9rem;
   color: #6b7280;
   line-height: 1.5;
+}
+.uploadRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
 }
