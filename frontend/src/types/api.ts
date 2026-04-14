@@ -106,3 +106,15 @@ export type CaseRecord = {
   updated_at: string;
   allow_public_contact: boolean;
 };
+
+export type SightingRecord = {
+  id: number;
+  reporter_name: string;
+  reporter_phone: string;
+  reporter_email: string;
+  message: string;
+  location: string;
+  contact_revealed: boolean;
+  contact_revealed_at: string | null;
+  created_at: string;
+};

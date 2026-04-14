@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchMyCases, fetchMyVehicles } from "@/lib/dashboard";
-import type { CaseRecord, VehicleRecord } from "@/types/api";
+import { fetchCaseSightings, fetchMyCases, fetchMyVehicles } from "@/lib/dashboard";
+import type { CaseRecord, SightingRecord, VehicleRecord } from "@/types/api";
 import styles from "./page.module.css";
+
+type SightingsByCase = Record<number, SightingRecord[]>;
 
 function getLatestCaseForVehicle(
   vehicleId: number,
@@ -32,6 +34,7 @@ function formatStatus(status?: CaseRecord["status"]) {
 export default function DashboardPage() {
   const [vehicles, setVehicles] = useState<VehicleRecord[]>([]);
   const [cases, setCases] = useState<CaseRecord[]>([]);
+  const [sightingsByCase, setSightingsByCase] = useState<SightingsByCase>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -52,6 +55,18 @@ export default function DashboardPage() {
 
         setVehicles(vehicleData);
         setCases(caseData);
+
+        const sightingsEntries = await Promise.all(
+          caseData.map(async (caseItem) => {
+            const sightings = await fetchCaseSightings(caseItem.id);
+            return [caseItem.id, sightings] as const;
+          })
+        );
+
+        if (!isMounted) return;
+
+        const sightingsMap: SightingsByCase = Object.fromEntries(sightingsEntries);
+        setSightingsByCase(sightingsMap);
       } catch (err) {
         if (!isMounted) return;
         setError(
@@ -95,7 +110,7 @@ export default function DashboardPage() {
         <div>
           <h2 className={styles.title}>My Vehicles</h2>
           <p className={styles.text}>
-            View your listed vehicles and their latest case status.
+            View your listed vehicles, case status, and recent sighting reports.
           </p>
         </div>
       </div>
@@ -108,6 +123,8 @@ export default function DashboardPage() {
         <div className={styles.grid}>
           {vehicles.map((vehicle) => {
             const latestCase = getLatestCaseForVehicle(vehicle.id, cases);
+            const sightings = latestCase ? sightingsByCase[latestCase.id] ?? [] : [];
+            const latestSighting = sightings[0];
 
             return (
               <article key={vehicle.id} className={styles.card}>
@@ -144,18 +161,40 @@ export default function DashboardPage() {
                         <strong>Case ID:</strong> {latestCase.id}
                       </p>
                       <p className={styles.meta}>
-                        <strong>Police Station:</strong>{" "}
-                        {latestCase.police_station}
+                        <strong>Police Station:</strong> {latestCase.police_station}
                       </p>
                       <p className={styles.meta}>
-                        <strong>Incident Date:</strong>{" "}
-                        {latestCase.incident_date}
+                        <strong>Incident Date:</strong> {latestCase.incident_date}
                       </p>
-                        {latestCase.description ? (
-                            <p className={styles.description}>
-                                <strong>Missing Note:</strong> {latestCase.description}
+
+                      {latestCase.description ? (
+                        <p className={styles.description}>
+                          <strong>Missing Note:</strong> {latestCase.description}
+                        </p>
+                      ) : null}
+
+                      <div className={styles.sightingBox}>
+                        <p className={styles.meta}>
+                          <strong>Sighting Reports:</strong> {sightings.length}
+                        </p>
+
+                        {latestSighting ? (
+                          <>
+                            <p className={styles.meta}>
+                              <strong>Latest Location:</strong> {latestSighting.location}
                             </p>
-                        ) : null}
+                            <p className={styles.meta}>
+                              <strong>Latest Message:</strong> {latestSighting.message}
+                            </p>
+                            <p className={styles.meta}>
+                              <strong>Reported At:</strong>{" "}
+                              {new Date(latestSighting.created_at).toLocaleString()}
+                            </p>
+                          </>
+                        ) : (
+                          <p className={styles.meta}>No sightings reported yet.</p>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className={styles.caseBox}>

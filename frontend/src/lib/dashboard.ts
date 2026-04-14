@@ -3,6 +3,7 @@ import { getAccessToken } from "./auth";
 import type {
   CaseRecord,
   PaginatedResponse,
+  SightingRecord,
   VehicleRecord,
 } from "@/types/api";
 
@@ -38,6 +39,10 @@ function isPaginatedResponse<T>(data: unknown): data is PaginatedResponse<T> {
     "results" in data &&
     Array.isArray((data as { results?: unknown }).results)
   );
+}
+
+function isSightingArray(data: unknown): data is SightingRecord[] {
+  return Array.isArray(data);
 }
 
 export async function fetchMyVehicles(): Promise<VehicleRecord[]> {
@@ -78,4 +83,24 @@ export async function fetchMyCases(): Promise<CaseRecord[]> {
   }
 
   return data.results;
+}
+
+export async function fetchCaseSightings(caseId: number): Promise<SightingRecord[]> {
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/sightings/`, {
+    method: "GET",
+    headers: getAuthHeaders(),
+    cache: "no-store",
+  });
+
+  const data: unknown = await response.json();
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(data, "Failed to fetch sightings."));
+  }
+
+  if (!isSightingArray(data)) {
+    throw new Error("Unexpected sightings response format.");
+  }
+
+  return data;
 }

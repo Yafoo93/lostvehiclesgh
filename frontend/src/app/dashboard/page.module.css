@@ -96,3 +96,10 @@
   color: #4b5563;
   line-height: 1.6;
 }
+.sightingBox {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
