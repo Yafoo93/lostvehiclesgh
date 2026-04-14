@@ -4,6 +4,10 @@
 
 .headerRow {
   margin-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .title {
@@ -102,4 +106,31 @@
   border-radius: 12px;
   background: #eff6ff;
   border: 1px solid #bfdbfe;
+}
+
+.addButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 11px 16px;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+}
+.actionRow {
+  margin-top: 10px;
+}
+
+.reportButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #dc2626;
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
 }

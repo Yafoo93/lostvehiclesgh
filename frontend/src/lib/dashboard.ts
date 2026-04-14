@@ -104,3 +104,57 @@ export async function fetchCaseSightings(caseId: number): Promise<SightingRecord
 
   return data;
 }
+
+export async function createVehicle(payload: {
+  plate_number: string;
+  vin?: string;
+  engine_number?: string;
+  make: string;
+  model: string;
+  year?: number;
+  color?: string;
+}) {
+  const response = await fetch(`${API_BASE_URL}/vehicles/`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data: unknown = await response.json();
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(data, "Failed to create vehicle."));
+  }
+
+  return data;
+}
+
+export async function createCase(payload: {
+  vehicle_id: number;
+  police_station: string;
+  police_case_number: string;
+  incident_date: string;
+  last_seen_location_text?: string;
+  description?: string;
+  allow_public_contact?: boolean;
+}) {
+  const response = await fetch(`${API_BASE_URL}/cases/`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data: unknown = await response.json();
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(data, "Failed to create case."));
+  }
+
+  return data;
+}

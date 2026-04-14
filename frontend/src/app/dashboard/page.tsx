@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { fetchCaseSightings, fetchMyCases, fetchMyVehicles } from "@/lib/dashboard";
 import type { CaseRecord, SightingRecord, VehicleRecord } from "@/types/api";
 import styles from "./page.module.css";
+import Link from "next/link";
 
 type SightingsByCase = Record<number, SightingRecord[]>;
 
@@ -108,11 +109,15 @@ export default function DashboardPage() {
     <section className={styles.page}>
       <div className={styles.headerRow}>
         <div>
-          <h2 className={styles.title}>My Vehicles</h2>
-          <p className={styles.text}>
-            View your listed vehicles, case status, and recent sighting reports.
-          </p>
+            <h2 className={styles.title}>My Vehicles</h2>
+            <p className={styles.text}>
+                View your listed vehicles, case status, and recent sighting reports.
+            </p>
         </div>
+
+        <Link href="/dashboard/vehicles/new" className={styles.addButton}>
+            Add Vehicle
+        </Link>
       </div>
 
       {vehicles.length === 0 ? (
@@ -154,6 +159,18 @@ export default function DashboardPage() {
                   <p className={styles.meta}>
                     <strong>Color:</strong> {vehicle.color || "N/A"}
                   </p>
+
+                {!latestCase ? (
+                    <div className={styles.actionRow}>
+                        <Link
+                            href={`/dashboard/cases/new?vehicleId=${vehicle.id}`}
+                            className={styles.reportButton}
+                        >
+                            Report Missing / Stolen
+                        </Link>
+                    </div>
+                ) : null}
+
 
                   {latestCase ? (
                     <div className={styles.caseBox}>
