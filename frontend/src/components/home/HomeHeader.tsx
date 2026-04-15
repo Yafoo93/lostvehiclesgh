@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fetchCurrentUser } from "@/lib/auth";
@@ -43,12 +44,20 @@ export default function HomeHeader() {
     <header className={styles.header}>
       <div className={styles.inner}>
         <Link href="/" className={styles.brand}>
-          <span className={styles.logoMark}>LVR</span>
+          <div className={styles.logoWrap}>
+            <Image
+              src="/logo.png"
+              alt="Lost Vehicle Registry Ghana logo"
+              width={56}
+              height={56}
+              className={styles.logo}
+              priority
+            />
+          </div>
+
           <div className={styles.brandText}>
             <span className={styles.companyName}>Lost Vehicle Registry Ghana</span>
-            <span className={styles.companyTag}>
-              Search. Report. Recover.
-            </span>
+            <span className={styles.companyTag}>Search. Report. Recover.</span>
           </div>
         </Link>
 

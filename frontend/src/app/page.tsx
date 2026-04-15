@@ -1,5 +1,6 @@
 import HomeHeader from "@/components/home/HomeHeader";
 import HeroSearch from "@/components/home/HeroSearch";
+import HomeFooter from "@/components/home/HomeFooter";
 import styles from "./page.module.css";
 
 export default function HomePage() {
@@ -21,6 +22,8 @@ export default function HomePage() {
           <HeroSearch />
         </div>
       </section>
+
+      <HomeFooter />
     </main>
   );
 }
