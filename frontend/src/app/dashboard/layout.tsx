@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { clearTokens, fetchCurrentUser, logoutUser } from "@/lib/auth";
 import type { AuthUser } from "@/types/api";
 import styles from "./layout.module.css";
+import Link from "next/link";
 
 export default function DashboardLayout({
   children,
@@ -73,18 +74,26 @@ export default function DashboardLayout({
       <div className={styles.shell}>
         <header className={styles.header}>
           <div className={styles.headerTop}>
-            <div>
-              <h1 className={styles.heading}>Dashboard</h1>
-              <p className={styles.subheading}>Welcome, {displayName}</p>
-            </div>
+              <div>
+                <h1 className={styles.heading}>Dashboard</h1>
+                <p className={styles.subheading}>Welcome, {displayName}</p>
+              </div>
 
-            <button
-              type="button"
-              className={styles.logoutButton}
-              onClick={handleLogout}
-            >
-              Logout
-            </button>
+            <div className={styles.headerActions}>
+              {(user.role === "MODERATOR" || user.role === "ADMIN") ? (
+                <Link href="/dashboard/moderation" className={styles.moderationLink}>
+                  Moderation
+                </Link>
+              ) : null}
+
+              <button
+                type="button"
+                className={styles.logoutButton}
+                onClick={handleLogout}
+              >
+                 Logout
+              </button>
+            </div>
           </div>
 
           <div className={styles.profileGrid}>
@@ -115,3 +124,4 @@ export default function DashboardLayout({
     </main>
   );
 }
+

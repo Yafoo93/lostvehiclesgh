@@ -1,20 +1,26 @@
-import SearchForm from "@/components/forms/SearchForm";
+import HomeHeader from "@/components/home/HomeHeader";
+import HeroSearch from "@/components/home/HeroSearch";
 import styles from "./page.module.css";
 
 export default function HomePage() {
   return (
     <main className={styles.page}>
-      <div className={styles.container}>
-        <section className={styles.heroCard}>
-          <h1 className={styles.title}>Lost Vehicle Registry Ghana</h1>
+      <HomeHeader />
+
+      <section className={styles.heroSection}>
+        <div className={styles.heroContent}>
+          <p className={styles.kicker}>Lost Vehicle Registry Ghana</p>
+          <h1 className={styles.title}>
+            Search a vehicle instantly by VIN or engine number
+          </h1>
           <p className={styles.subtitle}>
-            Search a vehicle by VIN or engine number to check whether it has been
-            reported stolen.
+            Check whether a vehicle has been reported missing or stolen, and
+            take the right next step if it has been found.
           </p>
 
-          <SearchForm />
-        </section>
-      </div>
+          <HeroSearch />
+        </div>
+      </section>
     </main>
   );
 }

@@ -200,3 +200,80 @@ export async function uploadCaseDocument(payload: {
 
   return data;
 }
+
+async function postCaseAction(
+  caseId: number,
+  action: "verify-stolen" | "reject" | "mark-recovered"
+) {
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/${action}/`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+  });
+
+  const data: unknown = await response.json();
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(data, `Failed to ${action} case.`));
+  }
+
+  return data;
+}
+
+export async function verifyCaseStolen(caseId: number) {
+  return postCaseAction(caseId, "verify-stolen");
+}
+
+export async function rejectCase(caseId: number) {
+  return postCaseAction(caseId, "reject");
+}
+
+export async function markCaseRecovered(caseId: number) {
+  return postCaseAction(caseId, "mark-recovered");
+}
+
+export type CaseDocumentRecord = {
+  id: number;
+  case: number;
+  doc_type: "POLICE_EXTRACT" | "VEHICLE_PHOTO";
+  file: string;
+  original_filename: string | null;
+  content_type: string | null;
+  file_size: number | null;
+  sha256_hash: string | null;
+  is_private: boolean;
+  created_at: string;
+};
+
+function isCaseDocumentPage(data: unknown): data is PaginatedResponse<CaseDocumentRecord> {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "results" in data &&
+    Array.isArray((data as { results?: unknown }).results)
+  );
+}
+
+export async function fetchCaseDocuments(
+  caseId: number
+): Promise<CaseDocumentRecord[]> {
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/documents/`, {
+    method: "GET",
+    headers: getAuthHeaders(),
+    cache: "no-store",
+  });
+
+  const data: unknown = await response.json();
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(data, "Failed to fetch case documents."));
+  }
+
+  if (!isCaseDocumentPage(data)) {
+    throw new Error("Unexpected case documents response format.");
+  }
+
+  return data.results;
+}
