@@ -12,10 +12,17 @@ class CaseAdmin(admin.ModelAdmin):
         "police_station",
         "police_case_number",
         "incident_date",
+        "recovery_requested_at",
         "created_at",
         "allow_public_contact",
     )
-    list_filter = ("status", "police_station", "incident_date", "created_at")
+    list_filter = (
+        "status",
+        "police_station",
+        "incident_date",
+        "recovery_requested_at",
+        "created_at",
+    )
     search_fields = (
         "vehicle__plate_number",
         "vehicle__vin",

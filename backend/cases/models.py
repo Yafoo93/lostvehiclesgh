@@ -58,16 +58,47 @@ class Case(models.Model):
         null=True,
         help_text="Additional details about the incident.",
     )
-    
+
     allow_public_contact = models.BooleanField(
-    default=False,
-    help_text="If enabled, owner's phone may be shared after a valid vehicle sighting report."
-    
+        default=False,
+        help_text="If enabled, owner's phone may be shared after a valid vehicle sighting report.",
+    )
+
+    recovery_requested_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="When the owner submitted a recovered-vehicle request.",
+    )
+    recovery_date = models.DateField(
+        blank=True,
+        null=True,
+        help_text="Date the vehicle was recovered.",
+    )
+    recovery_location = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Where the vehicle was recovered.",
+    )
+    recovery_circumstances = models.TextField(
+        blank=True,
+        null=True,
+        help_text="How the vehicle was recovered and the circumstances around it.",
+    )
+    recovery_vehicle_condition = models.TextField(
+        blank=True,
+        null=True,
+        help_text="The condition/state of the vehicle when it was found.",
+    )
+    recovery_additional_notes = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Any other relevant recovery details provided by the owner.",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     # Later we will add fields for moderator notes, recovery details, etc.
 
     class Meta:

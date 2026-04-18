@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from .models import Case
 from .permissions import IsOwnerOrModeratorOrReadOnly
@@ -8,12 +9,13 @@ from vehicles.models import Vehicle
 from .serializers import (
     CaseSerializer,
     PublicVehicleStatusSerializer,
+    RecoveryRequestSerializer,
     SightingReportCreateSerializer,
     SightingReportResponseSerializer,
     RevealContactResponseSerializer,
     SightingReportReadSerializer,
 )
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework import status as drf_status, filters as drf_filters
 from accounts.permissions import IsModeratorOrAdmin
@@ -21,6 +23,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from core.utils import log_activity
 from core.models import ActivityLog
 from .models import SightingReport
+from django.utils import timezone
 
 
 
@@ -122,19 +125,33 @@ class CaseViewSet(viewsets.ModelViewSet):
                 status=drf_status.HTTP_400_BAD_REQUEST,
             )
 
+        if case.recovery_requested_at is None:
+            return Response(
+                {
+                    "detail": (
+                        "This case cannot be marked as recovered yet. "
+                        "The owner must submit a recovery request first."
+                    )
+                },
+                status=drf_status.HTTP_400_BAD_REQUEST,
+            )
+
         previous_status = case.status
-        
+
         case.status = Case.Status.RECOVERED
         case.save(update_fields=["status", "updated_at"])
-        
+
         log_activity(
             user=request.user,
             action=ActivityLog.ActionType.CHANGE_CASE_STATUS,
-            description=f"Case status changed from {previous_status} to {case.status}.",
+            description=(
+                f"Case status changed from {previous_status} to {case.status}. "
+                f"Recovery request had been submitted at {case.recovery_requested_at}."
+            ),
             target=case,
             request=request,
         )
-        
+
         serializer = self.get_serializer(case)
         return Response(serializer.data, status=drf_status.HTTP_200_OK)
 
@@ -171,14 +188,87 @@ class CaseViewSet(viewsets.ModelViewSet):
     
     
     @action(
-    detail=True,
-    methods=["post"],
-    permission_classes=[AllowAny],
-    authentication_classes=[],
-    throttle_classes=[ScopedRateThrottle],
-    url_path="report-sighting",
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsAuthenticated],
+        url_path="request-recovery",
     )
+    def request_recovery(self, request, pk=None):
+        case = get_object_or_404(
+            Case.objects.select_related("reporter", "vehicle"),
+            pk=pk,
+        )
+
+        if case.reporter_id != request.user.id:
+            return Response(
+                {"detail": "Only the case owner can submit a recovery request."},
+                status=drf_status.HTTP_403_FORBIDDEN,
+            )
+
+        if case.status != Case.Status.VERIFIED_STOLEN:
+            return Response(
+                {"detail": "Recovery requests can only be submitted for verified stolen cases."},
+                status=drf_status.HTTP_400_BAD_REQUEST,
+            )
+
+        if case.recovery_requested_at is not None:
+            return Response(
+                {"detail": "A recovery request has already been submitted for this case."},
+                status=drf_status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = RecoveryRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        case.recovery_requested_at = timezone.now()
+        case.recovery_date = serializer.validated_data["recovery_date"]
+        case.recovery_location = serializer.validated_data["recovery_location"]
+        case.recovery_circumstances = serializer.validated_data["recovery_circumstances"]
+        case.recovery_vehicle_condition = serializer.validated_data["recovery_vehicle_condition"]
+        case.recovery_additional_notes = serializer.validated_data.get(
+            "recovery_additional_notes",
+            "",
+        )
+        case.save(
+            update_fields=[
+                "recovery_requested_at",
+                "recovery_date",
+                "recovery_location",
+                "recovery_circumstances",
+                "recovery_vehicle_condition",
+                "recovery_additional_notes",
+                "updated_at",
+            ]
+        )
+
+        log_activity(
+            user=request.user,
+            action=ActivityLog.ActionType.UPDATE_CASE,
+            description=(
+                f"Recovery request submitted for Case #{case.id} "
+                f"with recovery date {case.recovery_date}."
+            ),
+            target=case,
+            request=request,
+        )
+
+        return Response(
+            {
+                "detail": "Recovery request submitted successfully. Awaiting moderator confirmation.",
+                "case_id": case.id,
+                "recovery_requested_at": case.recovery_requested_at,
+            },
+            status=drf_status.HTTP_200_OK,
+        )
     
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[AllowAny],
+        authentication_classes=[],
+        throttle_classes=[ScopedRateThrottle],
+        url_path="report-sighting",
+    )
     def report_sighting(self, request, pk=None):
         case = self.get_object()
 
@@ -216,9 +306,20 @@ class CaseViewSet(viewsets.ModelViewSet):
         if case.allow_public_contact:
             owner_phone = getattr(case.reporter, "phone", None)
             contact_shared = bool(owner_phone)
+
             if contact_shared:
-                sighting.contact_revealed = True
-                sighting.save(update_fields=["contact_revealed"])
+                update_fields = []
+
+                if not sighting.contact_revealed:
+                    sighting.contact_revealed = True
+                    update_fields.append("contact_revealed")
+
+                if sighting.contact_revealed_at is None:
+                    sighting.contact_revealed_at = timezone.now()
+                    update_fields.append("contact_revealed_at")
+
+                if update_fields:
+                    sighting.save(update_fields=update_fields)
                 
         #### Prepare notification payloads (for future use when we implement notifications)
         owner_notification_payload = {
@@ -260,8 +361,8 @@ class CaseViewSet(viewsets.ModelViewSet):
         response_serializer = SightingReportResponseSerializer({
             "detail": "Sighting report submitted successfully.",
             "sighting_id": sighting.id,
-            "owner_phone": None,
-            "contact_shared": False,
+            "owner_phone": owner_phone if contact_shared else None,
+            "contact_shared": contact_shared,
         })
         return Response(response_serializer.data, status=drf_status.HTTP_201_CREATED)
     
@@ -305,8 +406,18 @@ class CaseViewSet(viewsets.ModelViewSet):
             contact_shared = bool(owner_phone)
 
         if contact_shared:
-            sighting.contact_revealed = True
-            sighting.save(update_fields=["contact_revealed"])
+            update_fields = []
+
+            if not sighting.contact_revealed:
+                sighting.contact_revealed = True
+                update_fields.append("contact_revealed")
+
+            if sighting.contact_revealed_at is None:
+                sighting.contact_revealed_at = timezone.now()
+                update_fields.append("contact_revealed_at")
+
+            if update_fields:
+                sighting.save(update_fields=update_fields)
 
         log_activity(
             user=None,
@@ -374,11 +485,12 @@ class PublicVehicleStatusView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Build a vehicle queryset
         vehicle_qs = Vehicle.objects.all()
+
         if vin:
             vin = vin.strip().upper()
             vehicle_qs = vehicle_qs.filter(vin__iexact=vin)
+
         if engine_number:
             engine_number = engine_number.strip().upper()
             vehicle_qs = vehicle_qs.filter(engine_number__iexact=engine_number)
@@ -386,52 +498,59 @@ class PublicVehicleStatusView(APIView):
         vehicle = vehicle_qs.first()
 
         if not vehicle:
-            data = {
+            serializer = PublicVehicleStatusSerializer({
                 "found": False,
                 "has_verified_stolen_case": False,
                 "latest_status": None,
                 "case_id": None,
+                "reporter_name": None,
+                "reported_at": None,
                 "last_updated": None,
                 "police_station": None,
                 "description": None,
                 "vehicle": None,
-            }
-            serializer = PublicVehicleStatusSerializer(data)
+            })
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-        # There is a vehicle, now check its cases
         cases = (
-            Case.objects.filter(vehicle=vehicle)
-            .order_by("-created_at")
-        )
+        Case.objects.select_related("reporter")
+        .filter(vehicle=vehicle)
+        .order_by("-created_at")
+    )
 
         if not cases.exists():
-            data = {
+            serializer = PublicVehicleStatusSerializer({
                 "found": True,
                 "has_verified_stolen_case": False,
                 "latest_status": None,
                 "case_id": None,
+                "reporter_name": None,
+                "reported_at": None,
                 "last_updated": None,
                 "police_station": None,
                 "description": None,
                 "vehicle": vehicle,
-            }
-            serializer = PublicVehicleStatusSerializer(data)
+            })
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-        # Latest case (by created_at)
         latest_case = cases.first()
-        has_verified_stolen = cases.filter(status=Case.Status.VERIFIED_STOLEN).exists()
+        has_verified_stolen = latest_case.status == Case.Status.VERIFIED_STOLEN
 
-        data = {
+        reporter_name = None
+        if latest_case.reporter_id:
+            full_name = f"{latest_case.reporter.first_name} {latest_case.reporter.last_name}".strip()
+            reporter_name = full_name or latest_case.reporter.username
+
+        serializer = PublicVehicleStatusSerializer({
             "found": True,
             "has_verified_stolen_case": has_verified_stolen,
             "latest_status": latest_case.status,
             "case_id": latest_case.id,
+            "reporter_name": reporter_name,
+            "reported_at": latest_case.created_at,
             "last_updated": latest_case.updated_at,
             "police_station": latest_case.police_station,
             "description": latest_case.description,
             "vehicle": vehicle,
-        }
-        serializer = PublicVehicleStatusSerializer(data)
+        })
         return Response(serializer.data, status=status.HTTP_200_OK)
