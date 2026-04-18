@@ -3,11 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { fetchCurrentUser } from "@/lib/auth";
 import type { AuthUser } from "@/types/api";
 import styles from "./HomeHeader.module.css";
 
 export default function HomeHeader() {
+  const pathname = usePathname();
+
   const [user, setUser] = useState<AuthUser | null>(null);
   const [checked, setChecked] = useState(false);
 
@@ -34,11 +37,15 @@ export default function HomeHeader() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [pathname]);
 
   const displayName = user
     ? `${user.first_name} ${user.last_name}`.trim() || user.username
     : "";
+
+  const reportHref = user
+    ? "/dashboard/vehicles/new"
+    : "/auth/login?next=/dashboard/vehicles/new";
 
   return (
     <header className={styles.header}>
@@ -62,13 +69,25 @@ export default function HomeHeader() {
         </Link>
 
         <nav className={styles.nav}>
-          <Link href="/auth/login" className={styles.navLink}>
-            {checked && user ? displayName : "Sign in"}
+          <Link href={reportHref} className={styles.reportLink}>
+            Report Missing Vehicle
           </Link>
 
-          <Link href="/dashboard" className={styles.dashboardLink}>
-            Dashboard
-          </Link>
+          {checked && user ? (
+            <>
+              <Link href="/dashboard" className={styles.navLink}>
+                {displayName}
+              </Link>
+
+              <Link href="/dashboard" className={styles.dashboardLink}>
+                Dashboard
+              </Link>
+            </>
+          ) : (
+            <Link href="/auth/login?next=/" className={styles.navLink}>
+              Sign in
+            </Link>
+          )}
         </nav>
       </div>
     </header>

@@ -134,3 +134,50 @@
   font-weight: 600;
   text-decoration: none;
 }
+.viewAllButton {
+  margin-top: 10px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sightingsList {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.sightingItem {
+  padding: 12px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #bfdbfe;
+}
+.recoverySection {
+  margin-top: 14px;
+}
+
+.recoveredRequestButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 10px;
+  background: #059669;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.recoveryPendingNote {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}

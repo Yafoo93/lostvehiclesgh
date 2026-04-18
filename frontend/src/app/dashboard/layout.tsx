@@ -1,12 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { clearTokens, fetchCurrentUser, logoutUser } from "@/lib/auth";
 import type { AuthUser } from "@/types/api";
 import styles from "./layout.module.css";
-import Link from "next/link";
 
 export default function DashboardLayout({
   children,
@@ -14,6 +14,7 @@ export default function DashboardLayout({
   children: ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
 
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -26,7 +27,6 @@ export default function DashboardLayout({
         const currentUser = await fetchCurrentUser();
 
         if (!isMounted) return;
-
         setUser(currentUser);
       } catch {
         clearTokens();
@@ -51,6 +51,10 @@ export default function DashboardLayout({
     router.push("/auth/login");
   }
 
+  function navClass(href: string) {
+    return pathname === href ? styles.activeNavLink : styles.navLink;
+  }
+
   if (loading) {
     return (
       <main className={styles.page}>
@@ -72,26 +76,20 @@ export default function DashboardLayout({
   return (
     <main className={styles.page}>
       <div className={styles.shell}>
-        <header className={styles.header}>
+        <section className={styles.header}>
           <div className={styles.headerTop}>
-              <div>
-                <h1 className={styles.heading}>Dashboard</h1>
-                <p className={styles.subheading}>Welcome, {displayName}</p>
-              </div>
+            <div>
+              <h1 className={styles.heading}>Dashboard</h1>
+              <p className={styles.subheading}>Welcome, {displayName}</p>
+            </div>
 
             <div className={styles.headerActions}>
-              {(user.role === "MODERATOR" || user.role === "ADMIN") ? (
-                <Link href="/dashboard/moderation" className={styles.moderationLink}>
-                  Moderation
-                </Link>
-              ) : null}
-
               <button
                 type="button"
                 className={styles.logoutButton}
                 onClick={handleLogout}
               >
-                 Logout
+                Logout
               </button>
             </div>
           </div>
@@ -117,11 +115,22 @@ export default function DashboardLayout({
               <span className={styles.profileValue}>{user.phone || "N/A"}</span>
             </div>
           </div>
-        </header>
+        </section>
+
+        <nav className={styles.navbar}>
+
+          {(user.role === "MODERATOR" || user.role === "ADMIN") ? (
+            <Link
+              href="/dashboard/moderation"
+              className={navClass("/dashboard/moderation")}
+            >
+              Moderation
+            </Link>
+          ) : null}
+        </nav>
 
         <section className={styles.content}>{children}</section>
       </div>
     </main>
   );
 }
-

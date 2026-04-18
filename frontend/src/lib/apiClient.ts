@@ -6,6 +6,7 @@ import type {
   RevealContactResponse,
 } from "@/types/api";
 
+
 type VehicleSearchParams = {
   vin?: string;
   engine_number?: string;
@@ -35,7 +36,7 @@ export async function checkVehicleStatus(
     throw new Error(data.detail || "Failed to check vehicle status.");
   }
 
-  return data;
+  return data as PublicVehicleStatusResponse;
 }
 
 export async function reportSighting(

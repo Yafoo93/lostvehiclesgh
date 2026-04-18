@@ -5,6 +5,7 @@ import { fetchCaseSightings, fetchMyCases, fetchMyVehicles } from "@/lib/dashboa
 import type { CaseRecord, SightingRecord, VehicleRecord } from "@/types/api";
 import styles from "./page.module.css";
 import Link from "next/link";
+import RecoveryRequestForm from "@/components/forms/RecoveryRequestForm";
 
 type SightingsByCase = Record<number, SightingRecord[]>;
 
@@ -32,10 +33,22 @@ function formatStatus(status?: CaseRecord["status"]) {
   }
 }
 
+function toggleSightingsForCase(
+  caseId: number,
+  setExpandedSightings: React.Dispatch<React.SetStateAction<Record<number, boolean>>>
+) {
+  setExpandedSightings((prev) => ({
+    ...prev,
+    [caseId]: !prev[caseId],
+  }));
+}
+
 export default function DashboardPage() {
   const [vehicles, setVehicles] = useState<VehicleRecord[]>([]);
   const [cases, setCases] = useState<CaseRecord[]>([]);
   const [sightingsByCase, setSightingsByCase] = useState<SightingsByCase>({});
+  const [openRecoveryCaseId, setOpenRecoveryCaseId] = useState<number | null>(null);
+  const [expandedSightings, setExpandedSightings] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -130,6 +143,8 @@ export default function DashboardPage() {
             const latestCase = getLatestCaseForVehicle(vehicle.id, cases);
             const sightings = latestCase ? sightingsByCase[latestCase.id] ?? [] : [];
             const latestSighting = sightings[0];
+            const isExpanded = latestCase ? Boolean(expandedSightings[latestCase.id]) : false;
+
 
             return (
               <article key={vehicle.id} className={styles.card}>
@@ -204,14 +219,130 @@ export default function DashboardPage() {
                               <strong>Latest Message:</strong> {latestSighting.message}
                             </p>
                             <p className={styles.meta}>
+                              <strong>Reporter Name:</strong>{" "}
+                              {latestSighting.reporter_name || "Not provided"}
+                            </p>
+                            <p className={styles.meta}>
+                              <strong>Reporter Phone:</strong>{" "}
+                              {latestSighting.reporter_phone || "Not provided"}
+                            </p>
+                            <p className={styles.meta}>
+                              <strong>Reporter Email:</strong>{" "}
+                              {latestSighting.reporter_email || "Not provided"}
+                            </p>
+                            <p className={styles.meta}>
                               <strong>Reported At:</strong>{" "}
                               {new Date(latestSighting.created_at).toLocaleString()}
                             </p>
+
+                            {sightings.length > 1 ? (
+                              <button
+                                type="button"
+                                className={styles.viewAllButton}
+                                onClick={() =>
+                                  latestCase &&
+                                  toggleSightingsForCase(
+                                    latestCase.id,
+                                    setExpandedSightings
+                                  )
+                                }
+                              >
+                                {isExpanded
+                                  ? "Hide all sighting reports"
+                                  : "View all sighting reports"}
+                              </button>
+                            ) : null}
+
+                            {isExpanded ? (
+                              <div className={styles.sightingsList}>
+                                {sightings.map((sighting) => (
+                                  <div key={sighting.id} className={styles.sightingItem}>
+                                    <p className={styles.meta}>
+                                      <strong>Location:</strong> {sighting.location}
+                                    </p>
+                                    <p className={styles.meta}>
+                                      <strong>Message:</strong> {sighting.message}
+                                    </p>
+                                    <p className={styles.meta}>
+                                      <strong>Reporter Name:</strong>{" "}
+                                      {sighting.reporter_name || "Not provided"}
+                                    </p>
+                                    <p className={styles.meta}>
+                                      <strong>Reporter Phone:</strong>{" "}
+                                      {sighting.reporter_phone || "Not provided"}
+                                    </p>
+                                    <p className={styles.meta}>
+                                      <strong>Reporter Email:</strong>{" "}
+                                      {sighting.reporter_email || "Not provided"}
+                                    </p>
+                                    <p className={styles.meta}>
+                                      <strong>Reported At:</strong>{" "}
+                                      {new Date(sighting.created_at).toLocaleString()}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
                           </>
                         ) : (
                           <p className={styles.meta}>No sightings reported yet.</p>
                         )}
                       </div>
+
+                      {latestCase.status === "VERIFIED_STOLEN" ? (
+                        <div className={styles.recoverySection}>
+                          {latestCase.recovery_requested_at ? (
+                            <div className={styles.recoveryPendingNote}>
+                              Recovery request submitted on{" "}
+                              {new Date(latestCase.recovery_requested_at).toLocaleString()}. Awaiting
+                              moderator confirmation.
+                            </div>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className={styles.recoveredRequestButton}
+                                onClick={() =>
+                                  setOpenRecoveryCaseId((prev) =>
+                                    prev === latestCase.id ? null : latestCase.id
+                                  )
+                                }
+                              >
+                                {openRecoveryCaseId === latestCase.id
+                                  ? "Hide Recovery Form"
+                                  : "Vehicle Recovered"}
+                              </button>
+
+                              {openRecoveryCaseId === latestCase.id ? (
+                                <RecoveryRequestForm
+                                  caseId={latestCase.id}
+                                  onCancel={() => setOpenRecoveryCaseId(null)}
+                                  onSubmitted={(submitted) => {
+                                    setCases((prevCases) =>
+                                      prevCases.map((caseItem) =>
+                                        caseItem.id === latestCase.id
+                                          ? {
+                                              ...caseItem,
+                                              recovery_requested_at: submitted.recovery_requested_at,
+                                              recovery_date: submitted.recovery_date,
+                                              recovery_location: submitted.recovery_location,
+                                              recovery_circumstances: submitted.recovery_circumstances,
+                                              recovery_vehicle_condition: submitted.recovery_vehicle_condition,
+                                              recovery_additional_notes:
+                                                submitted.recovery_additional_notes || null,
+                                            }
+                                          : caseItem
+                                      )
+                                    );
+                                    setOpenRecoveryCaseId(null);
+                                  }}
+                                />
+                              ) : null}
+                            </>
+                          )}
+                        </div>
+                      ) : null}
+
                     </div>
                   ) : (
                     <div className={styles.caseBox}>

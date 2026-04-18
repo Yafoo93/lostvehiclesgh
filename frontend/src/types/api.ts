@@ -13,10 +13,20 @@ export type PublicVehicleStatusResponse = {
   has_verified_stolen_case: boolean;
   latest_status: string | null;
   case_id: number | null;
+  reporter_name: string | null;
+  reported_at: string | null;
   last_updated: string | null;
   police_station: string | null;
   description: string | null;
-  vehicle: VehicleSummary | null;
+  vehicle: {
+    plate_number: string;
+    vin: string | null;
+    engine_number: string | null;
+    make: string;
+    model: string;
+    year: number | null;
+    color: string | null;
+  } | null;
 };
 
 export type ReportSightingPayload = {
@@ -38,6 +48,20 @@ export type RevealContactResponse = {
   detail: string;
   owner_phone: string | null;
   contact_shared: boolean;
+};
+
+export type RecoveryRequestPayload = {
+  recovery_date: string;
+  recovery_location: string;
+  recovery_circumstances: string;
+  recovery_vehicle_condition: string;
+  recovery_additional_notes?: string;
+};
+
+export type RecoveryRequestResponse = {
+  detail: string;
+  case_id: number;
+  recovery_requested_at: string;
 };
 
 export type AuthUser = {
@@ -102,9 +126,15 @@ export type CaseRecord = {
   incident_date: string;
   last_seen_location_text: string | null;
   description: string | null;
+  allow_public_contact: boolean;
+  recovery_requested_at: string | null;
+  recovery_date: string | null;
+  recovery_location: string | null;
+  recovery_circumstances: string | null;
+  recovery_vehicle_condition: string | null;
+  recovery_additional_notes: string | null;
   created_at: string;
   updated_at: string;
-  allow_public_contact: boolean;
 };
 
 export type SightingRecord = {

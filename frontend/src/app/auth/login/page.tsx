@@ -1,18 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
 import { loginUser } from "@/lib/auth";
 import styles from "./page.module.css";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const nextPath = useMemo(() => {
+    const rawNext = searchParams.get("next");
+
+    if (!rawNext) {
+      return "/dashboard";
+    }
+
+    // Only allow internal app routes.
+    if (!rawNext.startsWith("/") || rawNext.startsWith("//")) {
+      return "/dashboard";
+    }
+
+    return rawNext;
+  }, [searchParams]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -31,7 +47,7 @@ export default function LoginPage() {
         password,
       });
 
-      router.push("/dashboard");
+      router.push(nextPath);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
     } finally {

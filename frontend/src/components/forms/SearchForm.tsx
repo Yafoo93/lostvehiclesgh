@@ -6,6 +6,21 @@ import type { PublicVehicleStatusResponse } from "@/types/api";
 import ReportCaseForm from "./ReportCaseForm";
 import styles from "./SearchForm.module.css";
 
+function getStatusLabel(result: PublicVehicleStatusResponse): string {
+  switch (result.latest_status) {
+    case "VERIFIED_STOLEN":
+      return "Verified Stolen";
+    case "RECOVERED":
+      return "Recovered";
+    case "REJECTED":
+      return "Rejected";
+    case "PENDING":
+      return "Pending Review";
+    default:
+      return "No Record";
+  }
+}
+
 export default function SearchForm() {
   const [vin, setVin] = useState("");
   const [engineNumber, setEngineNumber] = useState("");
@@ -89,10 +104,7 @@ export default function SearchForm() {
             <>
               <div className={styles.infoBlock}>
                 <p className={styles.infoText}>
-                  <strong>Status:</strong>{" "}
-                  {result.has_verified_stolen_case
-                    ? "Verified Stolen"
-                    : result.latest_status || "No Record"}
+                  <strong>Status:</strong> {getStatusLabel(result)}
                 </p>
 
                 {result.vehicle ? (
@@ -119,45 +131,56 @@ export default function SearchForm() {
                     </p>
                   </>
                 ) : null}
-
-                {result.case_id ? (
-                  <p className={styles.infoText}>
-                    <strong>Case ID:</strong> {result.case_id}
-                  </p>
-                ) : null}
-
-                {result.last_updated ? (
-                  <p className={styles.infoText}>
-                    <strong>Last Updated:</strong>{" "}
-                    {new Date(result.last_updated).toLocaleString()}
-                  </p>
-                ) : null}
-
-                {result.police_station ? (
-                  <p className={styles.infoText}>
-                    <strong>Police Station:</strong> {result.police_station}
-                  </p>
-                ) : null}
-
-                {result.description ? (
-                  <p className={styles.infoText}>
-                    <strong>Description:</strong> {result.description}
-                  </p>
-                ) : null}
               </div>
 
-              {result.has_verified_stolen_case && result.case_id ? (
+              {result.latest_status === "VERIFIED_STOLEN" && result.case_id ? (
                 <div className={styles.section}>
+                  <h3 className={styles.resultTitle}>Verified Case Details</h3>
+
+                  <div className={styles.infoBlock}>
+                    <p className={styles.infoText}>
+                      <strong>Case ID:</strong> {result.case_id}
+                    </p>
+
+                    {result.reporter_name ? (
+                      <p className={styles.infoText}>
+                        <strong>Reported By:</strong> {result.reporter_name}
+                      </p>
+                    ) : null}
+
+                    {result.police_station ? (
+                      <p className={styles.infoText}>
+                        <strong>Police Station:</strong> {result.police_station}
+                      </p>
+                    ) : null}
+
+                    {result.reported_at ? (
+                      <p className={styles.infoText}>
+                        <strong>Reported On:</strong>{" "}
+                        {new Date(result.reported_at).toLocaleString()}
+                      </p>
+                    ) : null}
+
+                    {result.last_updated ? (
+                      <p className={styles.infoText}>
+                        <strong>Last Updated:</strong>{" "}
+                        {new Date(result.last_updated).toLocaleString()}
+                      </p>
+                    ) : null}
+
+                    {result.description ? (
+                      <p className={styles.infoText}>
+                        <strong>Brief Incident:</strong> {result.description}
+                      </p>
+                    ) : null}
+                  </div>
+
                   <button
                     type="button"
                     className={styles.secondaryButton}
-                    onClick={() =>
-                      setShowReportCaseForm((prev) => !prev)
-                    }
+                    onClick={() => setShowReportCaseForm((prev) => !prev)}
                   >
-                    {showReportCaseForm
-                      ? "Hide Sighting Form"
-                      : "I found this vehicle"}
+                    {showReportCaseForm ? "Hide Sighting Form" : "Report Sighting"}
                   </button>
 
                   {showReportCaseForm ? (

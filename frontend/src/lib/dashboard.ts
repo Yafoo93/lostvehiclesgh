@@ -3,6 +3,8 @@ import { getAccessToken } from "./auth";
 import type {
   CaseRecord,
   PaginatedResponse,
+  RecoveryRequestPayload,
+  RecoveryRequestResponse,
   SightingRecord,
   VehicleRecord,
 } from "@/types/api";
@@ -232,6 +234,41 @@ export async function rejectCase(caseId: number) {
 
 export async function markCaseRecovered(caseId: number) {
   return postCaseAction(caseId, "mark-recovered");
+}
+
+export async function requestCaseRecovery(
+  caseId: number,
+  payload: RecoveryRequestPayload
+): Promise<RecoveryRequestResponse> {
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/request-recovery/`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data: unknown = await response.json();
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(data, "Failed to submit recovery request."));
+  }
+
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("detail" in data) ||
+    typeof (data as { detail?: unknown }).detail !== "string" ||
+    !("case_id" in data) ||
+    typeof (data as { case_id?: unknown }).case_id !== "number" ||
+    !("recovery_requested_at" in data) ||
+    typeof (data as { recovery_requested_at?: unknown }).recovery_requested_at !== "string"
+  ) {
+    throw new Error("Unexpected recovery request response format.");
+  }
+
+  return data as RecoveryRequestResponse;
 }
 
 export type CaseDocumentRecord = {

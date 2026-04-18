@@ -1,20 +1,25 @@
-import "../styles/globals.css";
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import "./globals.css";
+import HomeHeader from "@/components/home/HomeHeader";
+import HomeFooter from "@/components/home/HomeFooter";
 
 export const metadata: Metadata = {
   title: "Lost Vehicle Registry Ghana",
-  description: "Missing Car Directory / Stolen Vehicle Recovery Platform for Ghana",
+  description: "Search, report, and recover vehicles in Ghana.",
 };
 
 export default function RootLayout({
   children,
-}: {
-  children: ReactNode;
-}) {
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html lang="en">
-      <body suppressHydrationWarning>{children}</body>
+      <body>
+        <HomeHeader />
+        {children}
+        <HomeFooter />
+      </body>
     </html>
   );
 }
