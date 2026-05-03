@@ -39,9 +39,9 @@ This roadmap reflects the current codebase as of May 2026.
    - Notify owners when sightings are submitted.
    - Notify moderators when suspicious or high-priority cases need review.
 
-3. Public report pages.
-   - Implement `/report` and `/cases/new` public-facing flows or remove placeholders.
-   - Decide whether unauthenticated users can start a report and finish after registration.
+3. Public report flow decisions.
+   - The unused `/report` and `/cases/new` placeholder routes have been removed.
+   - Decide later whether unauthenticated users should start a report and finish after registration.
 
 4. Role administration.
    - Add admin UI/API flows for assigning `MODERATOR`, `ADMIN`, and `PARTNER` roles.

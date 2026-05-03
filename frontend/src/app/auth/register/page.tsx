@@ -111,6 +111,7 @@ export default function RegisterPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Choose a username"
+              required
             />
           </div>
 
@@ -125,6 +126,7 @@ export default function RegisterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email"
+              required
             />
           </div>
 
@@ -154,6 +156,7 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
+                required
               />
             </div>
 
@@ -168,6 +171,7 @@ export default function RegisterPage() {
                 value={password2}
                 onChange={(e) => setPassword2(e.target.value)}
                 placeholder="Confirm password"
+                required
               />
             </div>
           </div>

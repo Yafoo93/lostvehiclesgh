@@ -28,6 +28,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
     Public registration serializer.
     We default role=OWNER for normal signups.
     """
+    email = serializers.EmailField(required=True, allow_blank=False)
     password = serializers.CharField(write_only=True, min_length=8)
     password2 = serializers.CharField(write_only=True, min_length=8, required=False)
 
@@ -46,8 +47,19 @@ class RegistrationSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
     def validate(self, attrs):
+        email = attrs.get("email", "").strip().lower()
         pwd = attrs.get("password")
         pwd2 = attrs.get("password2")
+
+        if not email:
+            raise serializers.ValidationError({"email": "Email is required."})
+
+        if User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError(
+                {"email": "A user with this email already exists."}
+            )
+
+        attrs["email"] = email
 
         if pwd2 and pwd != pwd2:
             raise serializers.ValidationError({"password2": "Passwords do not match."})

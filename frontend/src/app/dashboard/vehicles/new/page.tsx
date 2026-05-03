@@ -25,8 +25,8 @@ export default function NewVehiclePage() {
     setError("");
     setSuccessMessage("");
 
-    if (!plateNumber.trim() || !make.trim() || !model.trim()) {
-      setError("Plate number, make, and model are required.");
+    if (!vin.trim() || !make.trim() || !model.trim()) {
+      setError("VIN, make, and model are required.");
       return;
     }
 
@@ -34,8 +34,8 @@ export default function NewVehiclePage() {
       setLoading(true);
 
       await createVehicle({
-        plate_number: plateNumber.trim(),
-        vin: vin.trim() || undefined,
+        plate_number: plateNumber.trim() || undefined,
+        vin: vin.trim(),
         engine_number: engineNumber.trim() || undefined,
         make: make.trim(),
         model: model.trim(),
@@ -66,7 +66,7 @@ export default function NewVehiclePage() {
         <div className={styles.row}>
           <div className={styles.field}>
             <label htmlFor="plate_number" className={styles.label}>
-              Plate Number
+              Plate Number (Optional)
             </label>
             <input
               id="plate_number"
@@ -129,7 +129,8 @@ export default function NewVehiclePage() {
               className={styles.input}
               value={vin}
               onChange={(e) => setVin(e.target.value)}
-              placeholder="Optional VIN"
+              placeholder="Required VIN"
+              required
             />
           </div>
 

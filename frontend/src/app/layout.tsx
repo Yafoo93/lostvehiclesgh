@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import HomeHeader from "@/components/home/HomeHeader";
 import HomeFooter from "@/components/home/HomeFooter";
+import { AuthProvider } from "@/components/auth/AuthProvider";
 
 export const metadata: Metadata = {
   title: "Lost Vehicle Registry Ghana",
@@ -16,9 +17,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <HomeHeader />
-        {children}
-        <HomeFooter />
+        <AuthProvider>
+          <HomeHeader />
+          {children}
+          <HomeFooter />
+        </AuthProvider>
       </body>
     </html>
   );

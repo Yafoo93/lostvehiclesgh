@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { useMemo, useState } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { loginUser } from "@/lib/auth";
 import styles from "./page.module.css";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { refreshUser } = useAuth();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -47,6 +49,7 @@ function LoginForm() {
         username: username.trim(),
         password,
       });
+      await refreshUser();
 
       router.push(nextPath);
     } catch (err) {

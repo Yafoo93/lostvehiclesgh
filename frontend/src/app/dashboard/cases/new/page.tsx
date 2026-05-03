@@ -133,7 +133,7 @@ function NewCaseFormPage() {
             <option value="">Select a vehicle</option>
             {vehicles.map((vehicle) => (
               <option key={vehicle.id} value={vehicle.id}>
-                {vehicle.plate_number} — {vehicle.make} {vehicle.model}
+                {vehicle.vin} — {vehicle.make} {vehicle.model}
               </option>
             ))}
           </select>

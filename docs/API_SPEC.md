@@ -87,12 +87,14 @@ Authenticated.
 
 Authenticated. Creates a vehicle for the current user.
 
+VIN is required and case-insensitively unique. Plate number and engine number are optional because plate numbers can change; engine number is deduplicated when supplied.
+
 Body:
 
 ```json
 {
-  "plate_number": "GR-1234-24",
   "vin": "TESTVIN12345",
+  "plate_number": "GR-1234-24",
   "engine_number": "ENG12345",
   "make": "Toyota",
   "model": "Corolla",
@@ -160,6 +162,11 @@ Authenticated.
 ### `GET /cases/{case_id}/documents/`
 
 Authenticated. Accessible to the case reporter and moderators/admins.
+Returns document metadata and a protected `download_url`. Raw storage paths are not exposed.
+
+### `GET /documents/{document_id}/download/`
+
+Authenticated. Streams a private document only to the case reporter or moderators/admins.
 
 ### `POST /cases/{case_id}/documents/`
 
@@ -280,6 +287,8 @@ Body:
 ### `GET /check-vehicle/?vin=...&engine_number=...`
 
 Public. At least one query parameter is required.
+
+VIN is the preferred search key. Engine-number search remains available for public checks when the engine number is known.
 
 Only `VERIFIED_STOLEN` and `RECOVERED` cases are publicly disclosed. Pending and rejected cases return a no-record response.
 

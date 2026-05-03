@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "./config";
-import { getAccessToken } from "./auth";
+import { authenticatedFetch } from "./auth";
 import type {
   CaseRecord,
   PaginatedResponse,
@@ -8,18 +8,6 @@ import type {
   SightingRecord,
   VehicleRecord,
 } from "@/types/api";
-
-function getAuthHeaders() {
-  const token = getAccessToken();
-
-  if (!token) {
-    throw new Error("No access token found.");
-  }
-
-  return {
-    Authorization: `Bearer ${token}`,
-  };
-}
 
 function getErrorMessage(data: unknown, fallback: string) {
   if (
@@ -48,9 +36,8 @@ function isSightingArray(data: unknown): data is SightingRecord[] {
 }
 
 export async function fetchMyVehicles(): Promise<VehicleRecord[]> {
-  const response = await fetch(`${API_BASE_URL}/vehicles/`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/vehicles/`, {
     method: "GET",
-    headers: getAuthHeaders(),
     cache: "no-store",
   });
 
@@ -68,9 +55,8 @@ export async function fetchMyVehicles(): Promise<VehicleRecord[]> {
 }
 
 export async function fetchMyCases(): Promise<CaseRecord[]> {
-  const response = await fetch(`${API_BASE_URL}/cases/`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/cases/`, {
     method: "GET",
-    headers: getAuthHeaders(),
     cache: "no-store",
   });
 
@@ -88,9 +74,8 @@ export async function fetchMyCases(): Promise<CaseRecord[]> {
 }
 
 export async function fetchCaseSightings(caseId: number): Promise<SightingRecord[]> {
-  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/sightings/`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/cases/${caseId}/sightings/`, {
     method: "GET",
-    headers: getAuthHeaders(),
     cache: "no-store",
   });
 
@@ -108,18 +93,17 @@ export async function fetchCaseSightings(caseId: number): Promise<SightingRecord
 }
 
 export async function createVehicle(payload: {
-  plate_number: string;
-  vin?: string;
+  plate_number?: string;
+  vin: string;
   engine_number?: string;
   make: string;
   model: string;
   year?: number;
   color?: string;
 }) {
-  const response = await fetch(`${API_BASE_URL}/vehicles/`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/vehicles/`, {
     method: "POST",
     headers: {
-      ...getAuthHeaders(),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
@@ -147,10 +131,9 @@ export async function createCase(payload: {
   description?: string;
   allow_public_contact?: boolean;
 }): Promise<CreatedCaseResponse> {
-  const response = await fetch(`${API_BASE_URL}/cases/`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/cases/`, {
     method: "POST",
     headers: {
-      ...getAuthHeaders(),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
@@ -185,11 +168,10 @@ export async function uploadCaseDocument(payload: {
   formData.append("doc_type", payload.docType);
   formData.append("file", payload.file);
 
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/cases/${payload.caseId}/documents/`,
     {
       method: "POST",
-      headers: getAuthHeaders(),
       body: formData,
     }
   );
@@ -215,10 +197,9 @@ async function postCaseAction(
     | "flag-suspicious",
   payload?: Record<string, unknown>
 ) {
-  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/${action}/`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/cases/${caseId}/${action}/`, {
     method: "POST",
     headers: {
-      ...getAuthHeaders(),
       "Content-Type": "application/json",
     },
     body: payload ? JSON.stringify(payload) : undefined,
@@ -280,10 +261,9 @@ export async function requestCaseRecovery(
   caseId: number,
   payload: RecoveryRequestPayload
 ): Promise<RecoveryRequestResponse> {
-  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/request-recovery/`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/cases/${caseId}/request-recovery/`, {
     method: "POST",
     headers: {
-      ...getAuthHeaders(),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
@@ -315,7 +295,7 @@ export type CaseDocumentRecord = {
   id: number;
   case: number;
   doc_type: "POLICE_EXTRACT" | "VEHICLE_PHOTO";
-  file: string;
+  download_url: string;
   original_filename: string | null;
   content_type: string | null;
   file_size: number | null;
@@ -336,9 +316,8 @@ function isCaseDocumentPage(data: unknown): data is PaginatedResponse<CaseDocume
 export async function fetchCaseDocuments(
   caseId: number
 ): Promise<CaseDocumentRecord[]> {
-  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/documents/`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/cases/${caseId}/documents/`, {
     method: "GET",
-    headers: getAuthHeaders(),
     cache: "no-store",
   });
 
@@ -353,4 +332,28 @@ export async function fetchCaseDocuments(
   }
 
   return data.results;
+}
+
+export async function openCaseDocument(document: CaseDocumentRecord) {
+  const response = await authenticatedFetch(document.download_url, {
+    method: "GET",
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to open document.");
+  }
+
+  const blob = await response.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const opened = window.open(blobUrl, "_blank", "noopener,noreferrer");
+
+  if (!opened) {
+    window.location.href = blobUrl;
+    return;
+  }
+
+  window.setTimeout(() => {
+    window.URL.revokeObjectURL(blobUrl);
+  }, 60_000);
 }

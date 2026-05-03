@@ -101,6 +101,20 @@ class CaseViewSet(viewsets.ModelViewSet):
             )
 
         return None
+
+    def require_not_recovered(self, case):
+        if case.status == Case.Status.RECOVERED:
+            return Response(
+                {
+                    "detail": (
+                        "Recovered cases are final and cannot be moved back "
+                        "to another status without a formal reopen workflow."
+                    )
+                },
+                status=drf_status.HTTP_400_BAD_REQUEST,
+            )
+
+        return None
         
     @action(
         detail=True,
@@ -110,6 +124,10 @@ class CaseViewSet(viewsets.ModelViewSet):
     )
     def verify_stolen(self, request, pk=None):
         case = self.get_object()
+
+        recovered_response = self.require_not_recovered(case)
+        if recovered_response is not None:
+            return recovered_response
 
         missing_extract_response = self.require_police_extract(case)
         if missing_extract_response is not None:
@@ -280,6 +298,10 @@ class CaseViewSet(viewsets.ModelViewSet):
     )
     def reject(self, request, pk=None):
         case = self.get_object()
+
+        recovered_response = self.require_not_recovered(case)
+        if recovered_response is not None:
+            return recovered_response
 
         missing_extract_response = self.require_police_extract(case)
         if missing_extract_response is not None:
@@ -758,9 +780,7 @@ class PublicVehicleStatusView(APIView):
             engine_number = engine_number.strip().upper()
             vehicle_qs = vehicle_qs.filter(engine_number__iexact=engine_number)
 
-        vehicle = vehicle_qs.first()
-
-        if not vehicle:
+        if not vehicle_qs.exists():
             serializer = PublicVehicleStatusSerializer({
                 "found": False,
                 "has_verified_stolen_case": False,
@@ -776,9 +796,9 @@ class PublicVehicleStatusView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         public_cases = (
-            Case.objects.select_related("reporter")
+            Case.objects.select_related("reporter", "vehicle")
             .filter(
-                vehicle=vehicle,
+                vehicle__in=vehicle_qs,
                 status__in=[
                     Case.Status.VERIFIED_STOLEN,
                     Case.Status.RECOVERED,
@@ -820,6 +840,6 @@ class PublicVehicleStatusView(APIView):
             "last_updated": latest_case.updated_at,
             "police_station": latest_case.police_station,
             "description": latest_case.description,
-            "vehicle": vehicle,
+            "vehicle": latest_case.vehicle,
         })
         return Response(serializer.data, status=status.HTTP_200_OK)

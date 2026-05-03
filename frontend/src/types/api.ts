@@ -1,6 +1,6 @@
 export type VehicleSummary = {
-  plate_number: string;
-  vin: string | null;
+  plate_number: string | null;
+  vin: string;
   engine_number: string | null;
   make: string;
   model: string;
@@ -19,8 +19,8 @@ export type PublicVehicleStatusResponse = {
   police_station: string | null;
   description: string | null;
   vehicle: {
-    plate_number: string;
-    vin: string | null;
+    plate_number: string | null;
+    vin: string;
     engine_number: string | null;
     make: string;
     model: string;
@@ -105,8 +105,8 @@ export type PaginatedResponse<T> = {
 export type VehicleRecord = {
   id: number;
   owner: number;
-  plate_number: string;
-  vin: string | null;
+  plate_number: string | null;
+  vin: string;
   engine_number: string | null;
   make: string;
   model: string;

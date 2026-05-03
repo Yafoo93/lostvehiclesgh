@@ -1,7 +1,5 @@
 # Privacy Policy Draft
 
-This is an internal product draft for the current implementation. It should be reviewed by legal counsel before public launch.
-
 ## Data Collected
 
 Account data:

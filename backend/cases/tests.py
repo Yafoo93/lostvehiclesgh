@@ -1,7 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 from django.urls import reverse
 from rest_framework.test import APITestCase
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from documents.models import Document
 from vehicles.models import Vehicle
@@ -63,6 +66,84 @@ class PublicVehicleStatusViewTests(APITestCase):
             sha256_hash="test",
             is_private=True,
         )
+
+    def test_public_search_checks_public_cases_across_all_matching_vehicles(self):
+        first_vehicle = Vehicle(
+            plate_number="GR-1111-24",
+            vin="LEGACYVIN1",
+            engine_number="DUPENG123",
+            make="Toyota",
+            model="Corolla",
+            year=2018,
+            color="White",
+        )
+        second_vehicle = Vehicle(
+            plate_number="GR-2222-24",
+            vin="LEGACYVIN2",
+            engine_number="DUPENG123",
+            make="Honda",
+            model="Civic",
+            year=2020,
+            color="Black",
+        )
+        latest_case = SimpleNamespace(
+            id=4321,
+            status=Case.Status.VERIFIED_STOLEN,
+            reporter=self.owner,
+            reporter_id=self.owner.id,
+            created_at=timezone.now(),
+            updated_at=timezone.now(),
+            police_station="Dansoman Police Station",
+            description="Vehicle was last seen near Dansoman.",
+            vehicle=second_vehicle,
+        )
+
+        class FakeVehicleQuerySet:
+            def filter(self, **kwargs):
+                return self
+
+            def exists(self):
+                return True
+
+            def first(self):
+                return first_vehicle
+
+        class FakeVehicleManager:
+            def all(self):
+                return FakeVehicleQuerySet()
+
+        class FakeCaseQuerySet:
+            def __init__(self, cases):
+                self.cases = cases
+
+            def filter(self, **kwargs):
+                if "vehicle__in" in kwargs:
+                    return self
+                return FakeCaseQuerySet([])
+
+            def order_by(self, *args):
+                return self
+
+            def exists(self):
+                return bool(self.cases)
+
+            def first(self):
+                return self.cases[0]
+
+        class FakeCaseManager:
+            def select_related(self, *args):
+                return FakeCaseQuerySet([latest_case])
+
+        with (
+            patch("cases.views.Vehicle.objects", FakeVehicleManager()),
+            patch("cases.views.Case.objects", FakeCaseManager()),
+        ):
+            response = self.client.get(self.url, {"engine_number": "DUPENG123"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["found"])
+        self.assertEqual(response.data["case_id"], latest_case.id)
+        self.assertEqual(response.data["vehicle"]["vin"], second_vehicle.vin)
 
     def test_pending_case_is_not_publicly_disclosed(self):
         vehicle = self.create_vehicle()
@@ -177,6 +258,36 @@ class PublicVehicleStatusViewTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         case.refresh_from_db()
         self.assertEqual(case.status, Case.Status.VERIFIED_STOLEN)
+
+    def test_moderator_cannot_verify_recovered_case(self):
+        vehicle = self.create_vehicle(vin="RECOVEREDVERIFY", engine_number="RECVERIFY")
+        case = self.create_case(vehicle, Case.Status.RECOVERED)
+        self.create_police_extract(case)
+        self.client.force_authenticate(self.moderator)
+
+        response = self.client.post(reverse("case-verify-stolen", args=[case.id]))
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Recovered cases are final", response.data["detail"])
+        case.refresh_from_db()
+        self.assertEqual(case.status, Case.Status.RECOVERED)
+
+    def test_moderator_cannot_reject_recovered_case(self):
+        vehicle = self.create_vehicle(vin="RECOVEREDREJECT", engine_number="RECREJECT")
+        case = self.create_case(vehicle, Case.Status.RECOVERED)
+        self.create_police_extract(case)
+        self.client.force_authenticate(self.moderator)
+
+        response = self.client.post(
+            reverse("case-reject", args=[case.id]),
+            {"rejection_reason": "Trying to reject a recovered case."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Recovered cases are final", response.data["detail"])
+        case.refresh_from_db()
+        self.assertEqual(case.status, Case.Status.RECOVERED)
 
     def test_moderator_requests_more_info(self):
         vehicle = self.create_vehicle(vin="INFOVIN12345", engine_number="INFO123")

@@ -25,6 +25,15 @@ export default function HomeFooter() {
             <Link href="/dashboard" className={styles.link}>
               Dashboard
             </Link>
+            <Link href="/about" className={styles.link}>
+              About
+            </Link>
+            <Link href="/terms" className={styles.link}>
+              Terms of Use
+            </Link>
+            <Link href="/privacy" className={styles.link}>
+              Privacy Policy
+            </Link>
           </div>
         </div>
 
@@ -38,7 +47,7 @@ export default function HomeFooter() {
 
       <div className={styles.bottomBar}>
         <p className={styles.bottomText}>
-          © Lost Vehicle Registry Ghana. All rights reserved.
+          Copyright Lost Vehicle Registry Ghana. All rights reserved.
         </p>
       </div>
     </footer>

@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { clearTokens, fetchCurrentUser, logoutUser } from "@/lib/auth";
-import type { AuthUser } from "@/types/api";
+import { useAuth } from "@/components/auth/AuthProvider";
 import styles from "./layout.module.css";
 
 export default function DashboardLayout({
@@ -15,39 +14,16 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const { user, loading, logout } = useAuth();
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function checkAuth() {
-      try {
-        const currentUser = await fetchCurrentUser();
-
-        if (!isMounted) return;
-        setUser(currentUser);
-      } catch {
-        clearTokens();
-        router.replace("/auth/login");
-        return;
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
+    if (!loading && !user) {
+      router.replace("/auth/login");
     }
-
-    checkAuth();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [router]);
+  }, [loading, router, user]);
 
   function handleLogout() {
-    logoutUser();
+    logout();
     router.push("/auth/login");
   }
 

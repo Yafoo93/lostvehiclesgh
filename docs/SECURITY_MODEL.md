@@ -58,10 +58,11 @@ Current local behavior:
 
 - Files are stored under local media.
 - Django serves media during `DEBUG=True`.
+- Application document access uses authenticated download endpoints.
+- Document list responses expose protected `download_url` values, not raw storage paths.
 
 Required before production:
 
-- Serve private documents through authenticated endpoints or signed URLs.
 - Store documents in durable object storage.
 - Prevent direct public access to private media paths.
 

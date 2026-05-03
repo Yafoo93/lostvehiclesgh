@@ -2,6 +2,7 @@ import hashlib
 from pathlib import Path
 
 from rest_framework import serializers
+from django.urls import reverse
 
 from .models import Document
 
@@ -25,6 +26,8 @@ ALLOWED_EXTENSIONS_BY_DOC_TYPE = {
 
 
 class DocumentSerializer(serializers.ModelSerializer):
+    download_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Document
         fields = [
@@ -32,6 +35,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             "case",
             "doc_type",
             "file",
+            "download_url",
             "original_filename",
             "content_type",
             "file_size",
@@ -42,6 +46,7 @@ class DocumentSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "case",
+            "download_url",
             "original_filename",
             "content_type",
             "file_size",
@@ -49,6 +54,18 @@ class DocumentSerializer(serializers.ModelSerializer):
             "is_private",
             "created_at",
         ]
+        extra_kwargs = {
+            "file": {"write_only": True},
+        }
+
+    def get_download_url(self, obj):
+        request = self.context.get("request")
+        path = reverse("document-download", args=[obj.id])
+
+        if request is None:
+            return path
+
+        return request.build_absolute_uri(path)
 
     def validate(self, attrs):
         upload = attrs.get("file")

@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { fetchCurrentUser } from "@/lib/auth";
+import { useAuth } from "@/components/auth/AuthProvider";
 import {
   fetchCaseDocuments,
   fetchMyCases,
   fetchMyVehicles,
   markCaseRecovered,
+  openCaseDocument,
   rejectCase,
   rejectRecovery,
   requestMoreInfo,
@@ -16,9 +17,8 @@ import {
   verifyCaseStolen,
   type CaseDocumentRecord,
 } from "@/lib/dashboard";
-import type { AuthUser, CaseRecord, VehicleRecord } from "@/types/api";
+import type { CaseRecord, VehicleRecord } from "@/types/api";
 import styles from "./page.module.css";
-import { API_BASE_URL } from "@/lib/config";
 
 type StatusFilter =
   | "ALL"
@@ -26,6 +26,12 @@ type StatusFilter =
   | "RECOVERY_SUBMITTED";
 
 type DocumentsByCase = Record<number, CaseDocumentRecord[]>;
+type ModerationDialogAction = "reject" | "more-info" | "notes" | "flag";
+
+type ModerationDialog = {
+  action: ModerationDialogAction;
+  caseItem: CaseRecord;
+};
 
 function formatStatus(status: CaseRecord["status"]) {
   switch (status) {
@@ -44,15 +50,71 @@ function formatStatus(status: CaseRecord["status"]) {
   }
 }
 
-function getDocumentUrl(filePath: string) {
-  if (!filePath) return "#";
+function getDialogConfig(
+  caseItem: CaseRecord,
+  action: ModerationDialogAction
+) {
+  const hasRecoveryRequest =
+    caseItem.status === "VERIFIED_STOLEN" &&
+    caseItem.recovery_requested_at !== null;
 
-  if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
-    return filePath;
+  if (action === "reject") {
+    return {
+      title: hasRecoveryRequest ? "Reject Recovery Report" : "Reject Case",
+      description: hasRecoveryRequest
+        ? "Review the recovery details and record why this recovery report should not be approved."
+        : "Review the case details and record why this missing vehicle report should be rejected.",
+      label: hasRecoveryRequest ? "Recovery rejection reason" : "Case rejection reason",
+      placeholder: "Write a clear reason that can be reviewed later.",
+      confirmLabel: hasRecoveryRequest ? "Reject Recovery" : "Reject Case",
+      required: true,
+      minLength: 10,
+      isRecoveryReject: hasRecoveryRequest,
+      errorMessage: hasRecoveryRequest
+        ? "Failed to reject recovery report."
+        : "Failed to reject case.",
+    };
   }
 
-  const backendBase = API_BASE_URL.replace(/\/api$/, "");
-  return `${backendBase}${filePath}`;
+  if (action === "more-info") {
+    return {
+      title: "Request More Information",
+      description: "Tell the owner exactly what information or evidence is needed before this case can move forward.",
+      label: "Information requested from owner",
+      placeholder: "Example: Upload a clearer police extract showing the case number.",
+      confirmLabel: "Send Request",
+      required: true,
+      minLength: 10,
+      isRecoveryReject: false,
+      errorMessage: "Failed to request more information.",
+    };
+  }
+
+  if (action === "notes") {
+    return {
+      title: "Moderator Notes",
+      description: "Add or update internal notes for moderators and admins. These notes are not part of the public search result.",
+      label: "Internal notes",
+      placeholder: "Record internal review context, follow-up details, or risk notes.",
+      confirmLabel: "Save Notes",
+      required: false,
+      minLength: 0,
+      isRecoveryReject: false,
+      errorMessage: "Failed to update moderator notes.",
+    };
+  }
+
+  return {
+    title: "Flag Suspicious Case",
+    description: "Record why this case may involve fraud, inconsistent evidence, or suspicious reporting behavior.",
+    label: "Suspicious/fraud flag reason",
+    placeholder: "Explain the evidence or pattern that makes this case suspicious.",
+    confirmLabel: "Flag Case",
+    required: true,
+    minLength: 10,
+    isRecoveryReject: false,
+    errorMessage: "Failed to update suspicious flag.",
+  };
 }
 
 function formatDocType(docType: CaseDocumentRecord["doc_type"]) {
@@ -68,8 +130,8 @@ function formatDocType(docType: CaseDocumentRecord["doc_type"]) {
 
 export default function ModerationPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
 
-  const [user, setUser] = useState<AuthUser | null>(null);
   const [cases, setCases] = useState<CaseRecord[]>([]);
   const [vehiclesById, setVehiclesById] = useState<Record<number, VehicleRecord>>(
     {}
@@ -80,11 +142,16 @@ export default function ModerationPage() {
   const [actionLoadingKey, setActionLoadingKey] = useState("");
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [dialog, setDialog] = useState<ModerationDialog | null>(null);
+  const [dialogValue, setDialogValue] = useState("");
+  const [dialogError, setDialogError] = useState("");
 
   async function loadModerationData() {
-    const currentUser = await fetchCurrentUser();
+    if (!user) {
+      return;
+    }
 
-    if (currentUser.role !== "MODERATOR" && currentUser.role !== "ADMIN") {
+    if (user.role !== "MODERATOR" && user.role !== "ADMIN") {
       router.replace("/dashboard");
       return;
     }
@@ -107,7 +174,6 @@ export default function ModerationPage() {
 
     const mappedDocuments: DocumentsByCase = Object.fromEntries(documentEntries);
 
-    setUser(currentUser);
     setCases(caseData);
     setVehiclesById(mappedVehicles);
     setDocumentsByCase(mappedDocuments);
@@ -117,6 +183,15 @@ export default function ModerationPage() {
     let isMounted = true;
 
     async function run() {
+      if (authLoading) {
+        return;
+      }
+
+      if (!user) {
+        router.replace("/auth/login");
+        return;
+      }
+
       try {
         setLoading(true);
         setError("");
@@ -140,7 +215,7 @@ export default function ModerationPage() {
     return () => {
       isMounted = false;
     };
-  }, [router]);
+  }, [authLoading, router, user]);
 
   const filteredCases = useMemo(() => {
     if (statusFilter === "ALL") {
@@ -158,9 +233,26 @@ export default function ModerationPage() {
     return cases.filter((item) => item.status === statusFilter);
   }, [cases, statusFilter]);
 
+  const dialogVehicle = dialog ? vehiclesById[dialog.caseItem.vehicle] : null;
+  const dialogConfig = dialog ? getDialogConfig(dialog.caseItem, dialog.action) : null;
+
+  function openDialog(caseItem: CaseRecord, action: ModerationDialogAction) {
+    setDialog({ caseItem, action });
+    setDialogError("");
+    setError("");
+    setDialogValue(action === "notes" ? caseItem.moderator_notes || "" : "");
+  }
+
+  function closeDialog() {
+    if (actionLoadingKey) return;
+    setDialog(null);
+    setDialogValue("");
+    setDialogError("");
+  }
+
   async function handleAction(
     caseId: number,
-    action: "verify" | "reject" | "recover"
+    action: "verify" | "recover"
   ) {
     try {
       setActionLoadingKey(`${caseId}-${action}`);
@@ -168,27 +260,6 @@ export default function ModerationPage() {
 
       if (action === "verify") {
         await verifyCaseStolen(caseId);
-      } else if (action === "reject") {
-        const caseItem = cases.find((item) => item.id === caseId);
-        const hasRecoveryRequest =
-          caseItem?.status === "VERIFIED_STOLEN" &&
-          caseItem.recovery_requested_at !== null;
-        const reason = window.prompt(
-          hasRecoveryRequest
-            ? "Enter the recovery rejection reason:"
-            : "Enter the case rejection reason:"
-        );
-
-        if (!reason?.trim()) {
-          setActionLoadingKey("");
-          return;
-        }
-
-        if (hasRecoveryRequest) {
-          await rejectRecovery(caseId, reason.trim());
-        } else {
-          await rejectCase(caseId, reason.trim());
-        }
       } else {
         await markCaseRecovered(caseId);
       }
@@ -203,40 +274,42 @@ export default function ModerationPage() {
     }
   }
 
-  async function handleRequestMoreInfo(caseId: number) {
-    const note = window.prompt("Enter the information requested from the owner:");
-    if (!note?.trim()) return;
+  async function handleDialogSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
 
-    try {
-      setActionLoadingKey(`${caseId}-more-info`);
-      setError("");
-      await requestMoreInfo(caseId, note.trim());
-      await loadModerationData();
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to request more information."
+    if (!dialog || !dialogConfig) return;
+
+    const value = dialogValue.trim();
+
+    if (dialogConfig.required && value.length < dialogConfig.minLength) {
+      setDialogError(
+        `Enter at least ${dialogConfig.minLength} characters before confirming.`
       );
-    } finally {
-      setActionLoadingKey("");
+      return;
     }
-  }
-
-  async function handleUpdateNotes(caseItem: CaseRecord) {
-    const notes = window.prompt(
-      "Enter internal moderator notes:",
-      caseItem.moderator_notes || ""
-    );
-    if (notes === null) return;
 
     try {
-      setActionLoadingKey(`${caseItem.id}-notes`);
+      setActionLoadingKey(`${dialog.caseItem.id}-${dialog.action}`);
       setError("");
-      await updateModeratorNotes(caseItem.id, notes);
+
+      if (dialog.action === "reject") {
+        if (dialogConfig.isRecoveryReject) {
+          await rejectRecovery(dialog.caseItem.id, value);
+        } else {
+          await rejectCase(dialog.caseItem.id, value);
+        }
+      } else if (dialog.action === "more-info") {
+        await requestMoreInfo(dialog.caseItem.id, value);
+      } else if (dialog.action === "notes") {
+        await updateModeratorNotes(dialog.caseItem.id, dialogValue);
+      } else if (dialog.action === "flag") {
+        await setSuspiciousFlag(dialog.caseItem.id, true, value);
+      }
+
       await loadModerationData();
+      closeDialog();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to update moderator notes."
-      );
+      setDialogError(err instanceof Error ? err.message : dialogConfig.errorMessage);
     } finally {
       setActionLoadingKey("");
     }
@@ -244,18 +317,16 @@ export default function ModerationPage() {
 
   async function handleSuspiciousFlag(caseItem: CaseRecord) {
     const nextFlag = !caseItem.suspicious_flag;
-    let reason = "";
 
     if (nextFlag) {
-      const enteredReason = window.prompt("Enter the suspicious/fraud flag reason:");
-      if (!enteredReason?.trim()) return;
-      reason = enteredReason.trim();
+      openDialog(caseItem, "flag");
+      return;
     }
 
     try {
       setActionLoadingKey(`${caseItem.id}-flag`);
       setError("");
-      await setSuspiciousFlag(caseItem.id, nextFlag, reason);
+      await setSuspiciousFlag(caseItem.id, nextFlag, "");
       await loadModerationData();
     } catch (err) {
       setError(
@@ -266,7 +337,19 @@ export default function ModerationPage() {
     }
   }
 
-  if (loading) {
+  async function handleOpenDocument(document: CaseDocumentRecord) {
+    try {
+      setActionLoadingKey(`document-${document.id}`);
+      setError("");
+      await openCaseDocument(document);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to open document.");
+    } finally {
+      setActionLoadingKey("");
+    }
+  }
+
+  if (authLoading || loading) {
     return (
       <section className={styles.page}>
         <h2 className={styles.title}>Moderation Dashboard</h2>
@@ -352,6 +435,93 @@ export default function ModerationPage() {
 
       {error ? <div className={styles.error}>{error}</div> : null}
 
+      {dialog && dialogConfig ? (
+        <div className={styles.modalOverlay} role="presentation">
+          <form
+            className={styles.modal}
+            onSubmit={handleDialogSubmit}
+            aria-labelledby="moderation-dialog-title"
+          >
+            <div className={styles.modalHeader}>
+              <div>
+                <h3 id="moderation-dialog-title" className={styles.modalTitle}>
+                  {dialogConfig.title}
+                </h3>
+                <p className={styles.modalText}>{dialogConfig.description}</p>
+              </div>
+              <button
+                type="button"
+                className={styles.closeButton}
+                onClick={closeDialog}
+                aria-label="Close moderation dialog"
+                disabled={Boolean(actionLoadingKey)}
+              >
+                X
+              </button>
+            </div>
+
+            <div className={styles.caseSummary}>
+              <p className={styles.meta}>
+                <strong>Case:</strong> #{dialog.caseItem.id}
+              </p>
+              <p className={styles.meta}>
+                <strong>Status:</strong> {formatStatus(dialog.caseItem.status)}
+              </p>
+              <p className={styles.meta}>
+                <strong>Vehicle:</strong>{" "}
+                {dialogVehicle
+                  ? `${dialogVehicle.vin} - ${dialogVehicle.make} ${dialogVehicle.model}`
+                  : `Vehicle ID ${dialog.caseItem.vehicle}`}
+              </p>
+              <p className={styles.meta}>
+                <strong>Police Case:</strong>{" "}
+                {dialog.caseItem.police_case_number}
+              </p>
+            </div>
+
+            <label htmlFor="moderation-dialog-value" className={styles.label}>
+              {dialogConfig.label}
+            </label>
+            <textarea
+              id="moderation-dialog-value"
+              className={styles.textarea}
+              value={dialogValue}
+              onChange={(event) => {
+                setDialogValue(event.target.value);
+                setDialogError("");
+              }}
+              rows={6}
+              maxLength={1200}
+              placeholder={dialogConfig.placeholder}
+            />
+
+            {dialogError ? (
+              <div className={styles.dialogError}>{dialogError}</div>
+            ) : null}
+
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.cancelButton}
+                onClick={closeDialog}
+                disabled={Boolean(actionLoadingKey)}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className={styles.confirmButton}
+                disabled={Boolean(actionLoadingKey)}
+              >
+                {actionLoadingKey === `${dialog.caseItem.id}-${dialog.action}`
+                  ? "Saving..."
+                  : dialogConfig.confirmLabel}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
       {filteredCases.length === 0 ? (
         <div className={styles.emptyState}>No cases found for this filter.</div>
       ) : (
@@ -362,6 +532,7 @@ export default function ModerationPage() {
             const hasRecoveryRequest =
               caseItem.status === "VERIFIED_STOLEN" &&
               caseItem.recovery_requested_at !== null;
+            const isRecovered = caseItem.status === "RECOVERED";
 
             return (
               <article key={caseItem.id} className={styles.card}>
@@ -382,7 +553,7 @@ export default function ModerationPage() {
                   <p className={styles.meta}>
                     <strong>Vehicle:</strong>{" "}
                     {vehicle
-                      ? `${vehicle.plate_number} — ${vehicle.make} ${vehicle.model}`
+                      ? `${vehicle.vin} - ${vehicle.make} ${vehicle.model}`
                       : `Vehicle ID ${caseItem.vehicle}`}
                   </p>
                   <p className={styles.meta}>
@@ -500,14 +671,16 @@ export default function ModerationPage() {
                               {new Date(doc.created_at).toLocaleString()}
                             </p>
 
-                            <a
-                              href={getDocumentUrl(doc.file)}
-                              target="_blank"
-                              rel="noreferrer"
+                            <button
+                              type="button"
                               className={styles.openLink}
+                              onClick={() => handleOpenDocument(doc)}
+                              disabled={actionLoadingKey === `document-${doc.id}`}
                             >
-                              Open Attachment
-                            </a>
+                              {actionLoadingKey === `document-${doc.id}`
+                                ? "Opening..."
+                                : "Open Attachment"}
+                            </button>
                           </div>
                         ))}
                       </div>
@@ -521,7 +694,8 @@ export default function ModerationPage() {
                     className={styles.verifyButton}
                     disabled={
                       actionLoadingKey === `${caseItem.id}-verify` ||
-                      caseItem.status === "VERIFIED_STOLEN"
+                      caseItem.status === "VERIFIED_STOLEN" ||
+                      isRecovered
                     }
                     onClick={() => handleAction(caseItem.id, "verify")}
                   >
@@ -535,9 +709,10 @@ export default function ModerationPage() {
                     className={styles.rejectButton}
                     disabled={
                       actionLoadingKey === `${caseItem.id}-reject` ||
-                      caseItem.status === "REJECTED"
+                      caseItem.status === "REJECTED" ||
+                      isRecovered
                     }
-                    onClick={() => handleAction(caseItem.id, "reject")}
+                    onClick={() => openDialog(caseItem, "reject")}
                   >
                     {actionLoadingKey === `${caseItem.id}-reject`
                       ? "Rejecting..."
@@ -551,7 +726,7 @@ export default function ModerationPage() {
                     className={styles.recoverButton}
                     disabled={
                       actionLoadingKey === `${caseItem.id}-recover` ||
-                      caseItem.status === "RECOVERED" ||
+                      isRecovered ||
                       !hasRecoveryRequest
                     }
                     onClick={() => handleAction(caseItem.id, "recover")}
@@ -567,9 +742,9 @@ export default function ModerationPage() {
                     disabled={
                       actionLoadingKey === `${caseItem.id}-more-info` ||
                       caseItem.status === "REJECTED" ||
-                      caseItem.status === "RECOVERED"
+                      isRecovered
                     }
-                    onClick={() => handleRequestMoreInfo(caseItem.id)}
+                    onClick={() => openDialog(caseItem, "more-info")}
                   >
                     {actionLoadingKey === `${caseItem.id}-more-info`
                       ? "Requesting..."
@@ -580,7 +755,7 @@ export default function ModerationPage() {
                     type="button"
                     className={styles.notesButton}
                     disabled={actionLoadingKey === `${caseItem.id}-notes`}
-                    onClick={() => handleUpdateNotes(caseItem)}
+                    onClick={() => openDialog(caseItem, "notes")}
                   >
                     {actionLoadingKey === `${caseItem.id}-notes`
                       ? "Saving..."

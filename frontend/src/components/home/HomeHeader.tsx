@@ -2,42 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
-import { fetchCurrentUser } from "@/lib/auth";
-import type { AuthUser } from "@/types/api";
+import { useAuth } from "@/components/auth/AuthProvider";
 import styles from "./HomeHeader.module.css";
 
 export default function HomeHeader() {
-  const pathname = usePathname();
-
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [checked, setChecked] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadUser() {
-      try {
-        const currentUser = await fetchCurrentUser();
-        if (!active) return;
-        setUser(currentUser);
-      } catch {
-        if (!active) return;
-        setUser(null);
-      } finally {
-        if (active) {
-          setChecked(true);
-        }
-      }
-    }
-
-    loadUser();
-
-    return () => {
-      active = false;
-    };
-  }, [pathname]);
+  const { user, loading } = useAuth();
 
   const displayName = user
     ? `${user.first_name} ${user.last_name}`.trim() || user.username
@@ -73,7 +42,7 @@ export default function HomeHeader() {
             Report Missing Vehicle
           </Link>
 
-          {checked && user ? (
+          {!loading && user ? (
             <>
               <Link href="/dashboard" className={styles.navLink}>
                 {displayName}
@@ -83,11 +52,11 @@ export default function HomeHeader() {
                 Dashboard
               </Link>
             </>
-          ) : (
+          ) : !loading ? (
             <Link href="/auth/login?next=/" className={styles.navLink}>
               Sign in
             </Link>
-          )}
+          ) : null}
         </nav>
       </div>
     </header>

@@ -161,7 +161,7 @@ export default function DashboardPage() {
 
                 <div className={styles.cardBody}>
                   <p className={styles.meta}>
-                    <strong>Plate:</strong> {vehicle.plate_number}
+                    <strong>Plate:</strong> {vehicle.plate_number || "N/A"}
                   </p>
                   <p className={styles.meta}>
                     <strong>VIN:</strong> {vehicle.vin || "N/A"}

@@ -14,6 +14,15 @@ class CaseDocumentUploadTests(APITestCase):
             username="owner",
             password="test-pass-123",
         )
+        self.moderator = get_user_model().objects.create_user(
+            username="moderator",
+            password="test-pass-123",
+            role="MODERATOR",
+        )
+        self.other_user = get_user_model().objects.create_user(
+            username="other",
+            password="test-pass-123",
+        )
         self.vehicle = Vehicle.objects.create(
             owner=self.owner,
             plate_number="GR-4321-24",
@@ -34,6 +43,22 @@ class CaseDocumentUploadTests(APITestCase):
         )
         self.url = reverse("case-documents", args=[self.case.id])
         self.client.force_authenticate(self.owner)
+
+    def create_document(self):
+        return Document.objects.create(
+            case=self.case,
+            doc_type=Document.DocumentType.POLICE_EXTRACT,
+            file=SimpleUploadedFile(
+                "police-extract.pdf",
+                b"%PDF-1.4 private police extract",
+                content_type="application/pdf",
+            ),
+            original_filename="police-extract.pdf",
+            content_type="application/pdf",
+            file_size=31,
+            sha256_hash="test",
+            is_private=True,
+        )
 
     def test_upload_valid_police_extract(self):
         upload = SimpleUploadedFile(
@@ -57,6 +82,8 @@ class CaseDocumentUploadTests(APITestCase):
         self.assertEqual(document.content_type, "application/pdf")
         self.assertEqual(document.original_filename, "police-extract.pdf")
         self.assertTrue(document.sha256_hash)
+        self.assertNotIn("file", response.data)
+        self.assertIn("download_url", response.data)
 
     def test_rejects_unsupported_police_extract_type(self):
         upload = SimpleUploadedFile(
@@ -75,6 +102,50 @@ class CaseDocumentUploadTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 400)
+
+    def test_list_documents_exposes_protected_download_url_not_media_path(self):
+        document = self.create_document()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        result = response.data["results"][0]
+        self.assertEqual(result["id"], document.id)
+        self.assertNotIn("file", result)
+        self.assertIn(
+            reverse("document-download", args=[document.id]),
+            result["download_url"],
+        )
+
+    def test_owner_can_download_private_document(self):
+        document = self.create_document()
+        url = reverse("document-download", args=[document.id])
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertEqual(response["Cache-Control"], "private, no-store")
+        self.assertEqual(
+            b"".join(response.streaming_content),
+            b"%PDF-1.4 private police extract",
+        )
+
+    def test_moderator_can_download_private_document(self):
+        document = self.create_document()
+        self.client.force_authenticate(self.moderator)
+
+        response = self.client.get(reverse("document-download", args=[document.id]))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_other_user_cannot_download_private_document(self):
+        document = self.create_document()
+        self.client.force_authenticate(self.other_user)
+
+        response = self.client.get(reverse("document-download", args=[document.id]))
+
+        self.assertEqual(response.status_code, 403)
 
     def test_rejects_pdf_vehicle_photo(self):
         upload = SimpleUploadedFile(
