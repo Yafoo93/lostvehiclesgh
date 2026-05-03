@@ -11,6 +11,7 @@ from datetime import timedelta
 class Case(models.Model):
     class Status(models.TextChoices):
         PENDING = "PENDING", "Pending Review"
+        NEEDS_INFO = "NEEDS_INFO", "More Info Requested"
         VERIFIED_STOLEN = "VERIFIED_STOLEN", "Verified Stolen"
         REJECTED = "REJECTED", "Rejected"
         RECOVERED = "RECOVERED", "Recovered"
@@ -96,10 +97,68 @@ class Case(models.Model):
         help_text="Any other relevant recovery details provided by the owner.",
     )
 
+    recovery_reviewed_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="When the recovery request was reviewed by a moderator/admin.",
+    )
+    recovery_rejected_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="When the recovery request was rejected by a moderator/admin.",
+    )
+    recovery_rejection_note = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Reason provided by moderator/admin when rejecting a recovery request.",
+    )
+
+    rejection_reason = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Reason provided by moderator/admin when rejecting the case.",
+    )
+    moderator_notes = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Internal notes visible to moderators/admins only.",
+    )
+    more_info_requested_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="When a moderator/admin requested additional information.",
+    )
+    more_info_request_note = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Message explaining what additional information is needed.",
+    )
+    suspicious_flag = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Whether this case has been flagged as suspicious/fraudulent.",
+    )
+    suspicious_flag_reason = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Reason this case was flagged as suspicious/fraudulent.",
+    )
+    moderated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="moderated_cases",
+        help_text="Last moderator/admin who made a moderation decision.",
+    )
+    moderated_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="When the last moderation decision was made.",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
-    # Later we will add fields for moderator notes, recovery details, etc.
 
     class Meta:
         indexes = [

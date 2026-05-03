@@ -6,14 +6,20 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from vehicles.models import Vehicle
+from documents.models import Document
 from .serializers import (
     CaseSerializer,
+    CaseRejectSerializer,
+    ModeratorNotesSerializer,
+    MoreInfoRequestSerializer,
     PublicVehicleStatusSerializer,
     RecoveryRequestSerializer,
+    RecoveryRejectSerializer,
     SightingReportCreateSerializer,
     SightingReportResponseSerializer,
     RevealContactResponseSerializer,
     SightingReportReadSerializer,
+    SuspiciousFlagSerializer,
 )
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import action
@@ -77,6 +83,24 @@ class CaseViewSet(viewsets.ModelViewSet):
             filtered_queryset = filtered_queryset.filter(status=status_param)
 
         return filtered_queryset
+
+    def require_police_extract(self, case):
+        has_police_extract = case.documents.filter(
+            doc_type=Document.DocumentType.POLICE_EXTRACT,
+        ).exists()
+
+        if not has_police_extract:
+            return Response(
+                {
+                    "detail": (
+                        "A police extract must be uploaded before this case can "
+                        "receive a final moderation decision."
+                    )
+                },
+                status=drf_status.HTTP_400_BAD_REQUEST,
+            )
+
+        return None
         
     @action(
         detail=True,
@@ -87,6 +111,10 @@ class CaseViewSet(viewsets.ModelViewSet):
     def verify_stolen(self, request, pk=None):
         case = self.get_object()
 
+        missing_extract_response = self.require_police_extract(case)
+        if missing_extract_response is not None:
+            return missing_extract_response
+
         if case.status == Case.Status.VERIFIED_STOLEN:
             return Response(
                 {"detail": "Case is already marked as verified stolen."},
@@ -96,7 +124,22 @@ class CaseViewSet(viewsets.ModelViewSet):
         previous_status = case.status
 
         case.status = Case.Status.VERIFIED_STOLEN
-        case.save(update_fields=["status", "updated_at"])
+        case.moderated_by = request.user
+        case.moderated_at = timezone.now()
+        case.rejection_reason = None
+        case.more_info_request_note = None
+        case.more_info_requested_at = None
+        case.save(
+            update_fields=[
+                "status",
+                "moderated_by",
+                "moderated_at",
+                "rejection_reason",
+                "more_info_request_note",
+                "more_info_requested_at",
+                "updated_at",
+            ]
+        )
         
           # 👇 LOG ACTIVITY
         log_activity(
@@ -139,7 +182,22 @@ class CaseViewSet(viewsets.ModelViewSet):
         previous_status = case.status
 
         case.status = Case.Status.RECOVERED
-        case.save(update_fields=["status", "updated_at"])
+        case.recovery_reviewed_at = timezone.now()
+        case.recovery_rejected_at = None
+        case.recovery_rejection_note = None
+        case.moderated_by = request.user
+        case.moderated_at = timezone.now()
+        case.save(
+            update_fields=[
+                "status",
+                "recovery_reviewed_at",
+                "recovery_rejected_at",
+                "recovery_rejection_note",
+                "moderated_by",
+                "moderated_at",
+                "updated_at",
+            ]
+        )
 
         log_activity(
             user=request.user,
@@ -159,10 +217,73 @@ class CaseViewSet(viewsets.ModelViewSet):
         detail=True,
         methods=["post"],
         permission_classes=[IsModeratorOrAdmin],
+        url_path="reject-recovery",
+    )
+    def reject_recovery(self, request, pk=None):
+        case = self.get_object()
+
+        if case.recovery_requested_at is None:
+            return Response(
+                {"detail": "There is no submitted recovery request for this case."},
+                status=drf_status.HTTP_400_BAD_REQUEST,
+            )
+
+        if case.status != Case.Status.VERIFIED_STOLEN:
+            return Response(
+                {
+                    "detail": (
+                        "Recovery rejection is only valid while the case remains "
+                        "in verified stolen status."
+                    )
+                },
+                status=drf_status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = RecoveryRejectSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        case.recovery_reviewed_at = timezone.now()
+        case.recovery_rejected_at = timezone.now()
+        case.recovery_rejection_note = serializer.validated_data["recovery_rejection_note"]
+        case.moderated_by = request.user
+        case.moderated_at = timezone.now()
+        case.save(
+            update_fields=[
+                "recovery_reviewed_at",
+                "recovery_rejected_at",
+                "recovery_rejection_note",
+                "moderated_by",
+                "moderated_at",
+                "updated_at",
+            ]
+        )
+
+        log_activity(
+            user=request.user,
+            action=ActivityLog.ActionType.UPDATE_CASE,
+            description=(
+                f"Recovery request rejected for Case #{case.id}. "
+                f"Reason: {case.recovery_rejection_note}"
+            ),
+            target=case,
+            request=request,
+        )
+
+        response_serializer = self.get_serializer(case)
+        return Response(response_serializer.data, status=drf_status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsModeratorOrAdmin],
         url_path="reject",
     )
     def reject(self, request, pk=None):
         case = self.get_object()
+
+        missing_extract_response = self.require_police_extract(case)
+        if missing_extract_response is not None:
+            return missing_extract_response
 
         if case.status == Case.Status.REJECTED:
             return Response(
@@ -171,20 +292,162 @@ class CaseViewSet(viewsets.ModelViewSet):
             )
 
         previous_status = case.status
+
+        serializer = CaseRejectSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         
         case.status = Case.Status.REJECTED
-        case.save(update_fields=["status", "updated_at"])
+        case.rejection_reason = serializer.validated_data["rejection_reason"]
+        case.moderated_by = request.user
+        case.moderated_at = timezone.now()
+        case.save(
+            update_fields=[
+                "status",
+                "rejection_reason",
+                "moderated_by",
+                "moderated_at",
+                "updated_at",
+            ]
+        )
         
         log_activity(
             user=request.user,
             action=ActivityLog.ActionType.CHANGE_CASE_STATUS,
-            description=f"Case status changed from {previous_status} to {case.status}.",
+            description=(
+                f"Case status changed from {previous_status} to {case.status}. "
+                f"Reason: {case.rejection_reason}"
+            ),
             target=case,
             request=request,
         )
         
         serializer = self.get_serializer(case)
         return Response(serializer.data, status=drf_status.HTTP_200_OK)  
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsModeratorOrAdmin],
+        url_path="request-more-info",
+    )
+    def request_more_info(self, request, pk=None):
+        case = self.get_object()
+
+        if case.status in (Case.Status.REJECTED, Case.Status.RECOVERED):
+            return Response(
+                {"detail": "More information cannot be requested for this case status."},
+                status=drf_status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = MoreInfoRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        previous_status = case.status
+        case.status = Case.Status.NEEDS_INFO
+        case.more_info_requested_at = timezone.now()
+        case.more_info_request_note = serializer.validated_data["more_info_request_note"]
+        case.moderated_by = request.user
+        case.moderated_at = timezone.now()
+        case.save(
+            update_fields=[
+                "status",
+                "more_info_requested_at",
+                "more_info_request_note",
+                "moderated_by",
+                "moderated_at",
+                "updated_at",
+            ]
+        )
+
+        log_activity(
+            user=request.user,
+            action=ActivityLog.ActionType.CHANGE_CASE_STATUS,
+            description=(
+                f"Case status changed from {previous_status} to {case.status}. "
+                f"Requested info: {case.more_info_request_note}"
+            ),
+            target=case,
+            request=request,
+        )
+
+        response_serializer = self.get_serializer(case)
+        return Response(response_serializer.data, status=drf_status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsModeratorOrAdmin],
+        url_path="moderator-notes",
+    )
+    def update_moderator_notes(self, request, pk=None):
+        case = self.get_object()
+        serializer = ModeratorNotesSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        case.moderator_notes = serializer.validated_data["moderator_notes"]
+        case.moderated_by = request.user
+        case.moderated_at = timezone.now()
+        case.save(
+            update_fields=[
+                "moderator_notes",
+                "moderated_by",
+                "moderated_at",
+                "updated_at",
+            ]
+        )
+
+        log_activity(
+            user=request.user,
+            action=ActivityLog.ActionType.UPDATE_CASE,
+            description=f"Moderator notes updated for Case #{case.id}.",
+            target=case,
+            request=request,
+        )
+
+        response_serializer = self.get_serializer(case)
+        return Response(response_serializer.data, status=drf_status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsModeratorOrAdmin],
+        url_path="flag-suspicious",
+    )
+    def flag_suspicious(self, request, pk=None):
+        case = self.get_object()
+        serializer = SuspiciousFlagSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        case.suspicious_flag = serializer.validated_data["suspicious_flag"]
+        case.suspicious_flag_reason = serializer.validated_data.get(
+            "suspicious_flag_reason",
+            "",
+        )
+        case.moderated_by = request.user
+        case.moderated_at = timezone.now()
+        case.save(
+            update_fields=[
+                "suspicious_flag",
+                "suspicious_flag_reason",
+                "moderated_by",
+                "moderated_at",
+                "updated_at",
+            ]
+        )
+
+        log_activity(
+            user=request.user,
+            action=ActivityLog.ActionType.UPDATE_CASE,
+            description=(
+                f"Suspicious/fraud flag set to {case.suspicious_flag} for Case #{case.id}. "
+                f"Reason: {case.suspicious_flag_reason}"
+            ),
+            target=case,
+            request=request,
+        )
+
+        response_serializer = self.get_serializer(case)
+        return Response(response_serializer.data, status=drf_status.HTTP_200_OK)
     
     
     @action(
@@ -512,15 +775,21 @@ class PublicVehicleStatusView(APIView):
             })
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-        cases = (
-        Case.objects.select_related("reporter")
-        .filter(vehicle=vehicle)
-        .order_by("-created_at")
-    )
+        public_cases = (
+            Case.objects.select_related("reporter")
+            .filter(
+                vehicle=vehicle,
+                status__in=[
+                    Case.Status.VERIFIED_STOLEN,
+                    Case.Status.RECOVERED,
+                ],
+            )
+            .order_by("-created_at")
+        )
 
-        if not cases.exists():
+        if not public_cases.exists():
             serializer = PublicVehicleStatusSerializer({
-                "found": True,
+                "found": False,
                 "has_verified_stolen_case": False,
                 "latest_status": None,
                 "case_id": None,
@@ -529,11 +798,11 @@ class PublicVehicleStatusView(APIView):
                 "last_updated": None,
                 "police_station": None,
                 "description": None,
-                "vehicle": vehicle,
+                "vehicle": None,
             })
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-        latest_case = cases.first()
+        latest_case = public_cases.first()
         has_verified_stolen = latest_case.status == Case.Status.VERIFIED_STOLEN
 
         reporter_name = None

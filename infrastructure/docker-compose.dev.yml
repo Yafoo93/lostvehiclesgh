@@ -1,0 +1,37 @@
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/backend.Dockerfile
+    command: python manage.py runserver 0.0.0.0:8000
+    env_file:
+      - ../.env.example
+    environment:
+      DEBUG: "True"
+      ALLOWED_HOSTS: "127.0.0.1,localhost,backend"
+    volumes:
+      - ../backend:/app
+      - backend_media:/app/media
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/frontend.Dockerfile
+    command: npm run dev
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000/api
+    volumes:
+      - ../frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - frontend_next:/app/.next
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  backend_media:
+  frontend_node_modules:
+  frontend_next:

@@ -22,6 +22,8 @@ function formatStatus(status?: CaseRecord["status"]) {
   switch (status) {
     case "PENDING":
       return "Pending Review";
+    case "NEEDS_INFO":
+      return "More Info Requested";
     case "VERIFIED_STOLEN":
       return "Verified Stolen";
     case "REJECTED":

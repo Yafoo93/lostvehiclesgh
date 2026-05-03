@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { createCase, fetchMyVehicles, uploadCaseDocument } from "@/lib/dashboard";
 import type { VehicleRecord } from "@/types/api";
 import styles from "./page.module.css";
 
-export default function NewCasePage() {
+function NewCaseFormPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -270,5 +271,13 @@ export default function NewCasePage() {
         </button>
       </form>
     </section>
+  );
+}
+
+export default function NewCasePage() {
+  return (
+    <Suspense fallback={null}>
+      <NewCaseFormPage />
+    </Suspense>
   );
 }

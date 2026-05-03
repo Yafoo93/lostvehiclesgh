@@ -29,6 +29,14 @@ class CaseSerializer(serializers.ModelSerializer):
             "vehicle_id",
             "reporter",
             "status",
+            "rejection_reason",
+            "moderator_notes",
+            "more_info_requested_at",
+            "more_info_request_note",
+            "suspicious_flag",
+            "suspicious_flag_reason",
+            "moderated_by",
+            "moderated_at",
             "police_station",
             "police_case_number",
             "incident_date",
@@ -41,6 +49,9 @@ class CaseSerializer(serializers.ModelSerializer):
             "recovery_circumstances",
             "recovery_vehicle_condition",
             "recovery_additional_notes",
+            "recovery_reviewed_at",
+            "recovery_rejected_at",
+            "recovery_rejection_note",
             "created_at",
             "updated_at",
         ]
@@ -49,12 +60,23 @@ class CaseSerializer(serializers.ModelSerializer):
             "vehicle",
             "reporter",
             "status",
+            "rejection_reason",
+            "moderator_notes",
+            "more_info_requested_at",
+            "more_info_request_note",
+            "suspicious_flag",
+            "suspicious_flag_reason",
+            "moderated_by",
+            "moderated_at",
             "recovery_requested_at",
             "recovery_date",
             "recovery_location",
             "recovery_circumstances",
             "recovery_vehicle_condition",
             "recovery_additional_notes",
+            "recovery_reviewed_at",
+            "recovery_rejected_at",
+            "recovery_rejection_note",
             "created_at",
             "updated_at",
         ]
@@ -116,6 +138,18 @@ class CaseSerializer(serializers.ModelSerializer):
 
         return value
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+
+        if not user or not (user.is_authenticated and (user.is_moderator or user.is_admin)):
+            data.pop("moderator_notes", None)
+            data.pop("suspicious_flag", None)
+            data.pop("suspicious_flag_reason", None)
+
+        return data
+
 class PublicVehicleStatusSerializer(serializers.Serializer):
     """
     Serializer for public vehicle status check.
@@ -143,6 +177,37 @@ class RecoveryRequestSerializer(serializers.Serializer):
         allow_blank=True,
     )
     
+class RecoveryRejectSerializer(serializers.Serializer):
+    recovery_rejection_note = serializers.CharField()
+
+
+class CaseRejectSerializer(serializers.Serializer):
+    rejection_reason = serializers.CharField()
+
+
+class MoreInfoRequestSerializer(serializers.Serializer):
+    more_info_request_note = serializers.CharField()
+
+
+class ModeratorNotesSerializer(serializers.Serializer):
+    moderator_notes = serializers.CharField(allow_blank=True)
+
+
+class SuspiciousFlagSerializer(serializers.Serializer):
+    suspicious_flag = serializers.BooleanField(default=True)
+    suspicious_flag_reason = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        suspicious_flag = attrs.get("suspicious_flag", True)
+        reason = attrs.get("suspicious_flag_reason", "")
+
+        if suspicious_flag and not reason.strip():
+            raise serializers.ValidationError(
+                {"suspicious_flag_reason": "Reason is required when flagging a case."}
+            )
+
+        return attrs
+
 class SightingReportCreateSerializer(serializers.Serializer):
     reporter_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
     reporter_phone = serializers.CharField(max_length=50, required=False, allow_blank=True)

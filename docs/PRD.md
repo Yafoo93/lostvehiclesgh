@@ -304,4 +304,73 @@ The project is successful if:
 
 
 
+## 14. Current Implementation Status
+
+This section reflects the current codebase and highlights where implementation differs from or only partially satisfies the full PRD.
+
+### 14.1 Implemented User Flows
+
+#### Public Search
+
+1. User enters VIN and/or engine number.
+2. API checks public cases only.
+3. If no verified stolen or recovered case exists, the app returns no public record.
+4. If a verified stolen case exists, the app shows vehicle summary and case summary.
+5. User can submit a sighting report.
+6. User can reveal owner phone only if the owner allowed public contact and a sighting exists.
+
+#### Owner Onboarding
+
+1. Owner registers with username, email, optional name, optional phone, and password.
+2. Owner logs in with username or email.
+3. Frontend stores JWT tokens in local storage.
+
+#### Owner Vehicle And Case Management
+
+1. Owner adds a vehicle with plate number, make, model, optional VIN, optional engine number, optional year, and optional color.
+2. Owner creates a case for one of their vehicles.
+3. Owner submits police station, police case number, incident date, optional location, optional description, public contact consent, police extract, and optional vehicle photos.
+4. Owner dashboard shows vehicles, latest cases, sighting reports, and recovery request controls.
+
+#### Moderation
+
+1. Moderator/admin opens moderation dashboard.
+2. Moderator/admin filters cases by status or recovery-submitted state.
+3. Moderator/admin reviews vehicle details, case details, documents, notes, suspicious flag, and recovery details.
+4. Moderator/admin can verify stolen, reject, request more info, update internal notes, flag suspicious, approve recovery, or reject recovery.
+
+#### Recovery
+
+1. Owner with a `VERIFIED_STOLEN` case submits recovery date, location, circumstances, vehicle condition, and optional notes.
+2. Moderator/admin approves the recovery and marks the case `RECOVERED`, or rejects the recovery request with a note.
+
+### 14.2 Implemented Functional Requirements
+
+- Public search must require VIN or engine number.
+- Pending and rejected cases must not be publicly disclosed.
+- Final moderation decisions to verify or reject a case must require a police extract document.
+- Owners must only create cases for their own vehicles unless they are moderators/admins.
+- Sighting reports must only be accepted for verified stolen cases.
+- Duplicate sightings within five minutes should be rejected when case, reporter phone, location, and message match.
+- Documents must be capped at 5 MB and constrained by document type.
+- Moderator-only fields must not be shown to ordinary owners.
+
+### 14.3 Implemented Non-Functional Requirements
+
+- API responses should use consistent DRF pagination for list endpoints.
+- Public endpoints should be throttled.
+- Sensitive uploaded documents should be treated as private.
+- Moderation and recovery actions should be audit logged.
+- Environment setup should work locally with SQLite.
+
+### 14.4 Not Yet Implemented
+
+- Production PostgreSQL settings.
+- SMS/email/in-app notification delivery.
+- Partner-specific workflows.
+- OTP verification despite the current frontend route.
+- Public unauthenticated missing-vehicle report flow.
+- Private signed document download endpoints.
+- Frontend automated tests.
+
 KASSIM MUTAWAKIL

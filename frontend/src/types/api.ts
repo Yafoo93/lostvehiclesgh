@@ -120,7 +120,20 @@ export type CaseRecord = {
   id: number;
   vehicle: number;
   reporter: number;
-  status: "PENDING" | "VERIFIED_STOLEN" | "REJECTED" | "RECOVERED";
+  status:
+    | "PENDING"
+    | "NEEDS_INFO"
+    | "VERIFIED_STOLEN"
+    | "REJECTED"
+    | "RECOVERED";
+  rejection_reason: string | null;
+  moderator_notes: string | null;
+  more_info_requested_at: string | null;
+  more_info_request_note: string | null;
+  suspicious_flag: boolean;
+  suspicious_flag_reason: string | null;
+  moderated_by: number | null;
+  moderated_at: string | null;
   police_station: string;
   police_case_number: string;
   incident_date: string;

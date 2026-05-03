@@ -205,7 +205,15 @@ export async function uploadCaseDocument(payload: {
 
 async function postCaseAction(
   caseId: number,
-  action: "verify-stolen" | "reject" | "mark-recovered"
+  action:
+    | "verify-stolen"
+    | "reject"
+    | "reject-recovery"
+    | "mark-recovered"
+    | "request-more-info"
+    | "moderator-notes"
+    | "flag-suspicious",
+  payload?: Record<string, unknown>
 ) {
   const response = await fetch(`${API_BASE_URL}/cases/${caseId}/${action}/`, {
     method: "POST",
@@ -213,6 +221,7 @@ async function postCaseAction(
       ...getAuthHeaders(),
       "Content-Type": "application/json",
     },
+    body: payload ? JSON.stringify(payload) : undefined,
   });
 
   const data: unknown = await response.json();
@@ -228,12 +237,43 @@ export async function verifyCaseStolen(caseId: number) {
   return postCaseAction(caseId, "verify-stolen");
 }
 
-export async function rejectCase(caseId: number) {
-  return postCaseAction(caseId, "reject");
+export async function rejectCase(caseId: number, rejectionReason: string) {
+  return postCaseAction(caseId, "reject", {
+    rejection_reason: rejectionReason,
+  });
+}
+
+export async function rejectRecovery(caseId: number, rejectionNote: string) {
+  return postCaseAction(caseId, "reject-recovery", {
+    recovery_rejection_note: rejectionNote,
+  });
 }
 
 export async function markCaseRecovered(caseId: number) {
   return postCaseAction(caseId, "mark-recovered");
+}
+
+export async function requestMoreInfo(caseId: number, note: string) {
+  return postCaseAction(caseId, "request-more-info", {
+    more_info_request_note: note,
+  });
+}
+
+export async function updateModeratorNotes(caseId: number, notes: string) {
+  return postCaseAction(caseId, "moderator-notes", {
+    moderator_notes: notes,
+  });
+}
+
+export async function setSuspiciousFlag(
+  caseId: number,
+  suspiciousFlag: boolean,
+  reason = ""
+) {
+  return postCaseAction(caseId, "flag-suspicious", {
+    suspicious_flag: suspiciousFlag,
+    suspicious_flag_reason: reason,
+  });
 }
 
 export async function requestCaseRecovery(
