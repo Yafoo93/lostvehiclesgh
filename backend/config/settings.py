@@ -165,6 +165,7 @@ REST_FRAMEWORK = {
         "case_create": "20/hour",
         "report_sighting": "10/min",
         "reveal_contact": "5/min",
+        "password_reset": "5/hour",
     },
 }
 
@@ -180,6 +181,16 @@ SIMPLE_JWT = {
     ),
 }
 
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend",
+)
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@lostvehiclesgh.com")
+
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "http://localhost:3000",
+)
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"

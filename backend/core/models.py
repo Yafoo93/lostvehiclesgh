@@ -30,6 +30,8 @@ class ActivityLog(models.Model):
         VERIFY_STOLEN = "VERIFY_STOLEN", "Verify Stolen"
         MARK_RECOVERED = "MARK_RECOVERED", "Mark Recovered"
         PUBLIC_SEARCH = "PUBLIC_SEARCH", "Public Search"
+        PASSWORD_RESET = "PASSWORD_RESET", "Password Reset"
+        PASSWORD_RESET_REQUEST = "PASSWORD_RESET_REQUEST", "Password Reset Request"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
