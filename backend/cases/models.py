@@ -171,8 +171,9 @@ class Case(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["status"]),
-            models.Index(fields=["police_case_number"]),
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["suspicious_flag", "created_at"]),
+            models.Index(fields=["moderated_at"]),
         ]
         ordering = ["-created_at"]
 
@@ -200,6 +201,8 @@ class SightingReport(models.Model):
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["case", "created_at"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["contact_revealed"]),
         ]
 
     def clean(self):
