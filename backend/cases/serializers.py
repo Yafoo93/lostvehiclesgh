@@ -112,6 +112,38 @@ class CaseSerializer(serializers.ModelSerializer):
 
         return value
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        vehicle = attrs.get("vehicle")
+
+        if vehicle is None and self.instance is not None:
+            vehicle = self.instance.vehicle
+
+        if vehicle is None:
+            return attrs
+
+        active_statuses = [
+            Case.Status.PENDING,
+            Case.Status.NEEDS_INFO,
+            Case.Status.VERIFIED_STOLEN,
+        ]
+
+        queryset = Case.objects.filter(
+            vehicle=vehicle,
+            status__in=active_statuses,
+        )
+
+        if self.instance is not None:
+            queryset = queryset.exclude(pk=self.instance.pk)
+
+        if queryset.exists():
+            raise serializers.ValidationError(
+                "An active case already exists for this vehicle."
+            )
+
+        return attrs
+
     def create(self, validated_data):
         request = self.context.get("request")
         user = getattr(request, "user", None)
@@ -143,7 +175,9 @@ class CaseSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         user = getattr(request, "user", None)
 
-        if not user or not (user.is_authenticated and (user.is_moderator or user.is_admin)):
+        if not user or not (
+            user.is_authenticated and (user.is_moderator or user.is_admin)
+        ):
             data.pop("moderator_notes", None)
             data.pop("suspicious_flag", None)
             data.pop("suspicious_flag_reason", None)

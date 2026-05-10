@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Vehicle
+import re
 
 
 class VehicleSerializer(serializers.ModelSerializer):
@@ -61,6 +62,15 @@ class VehicleSerializer(serializers.ModelSerializer):
         if not vin:
             raise serializers.ValidationError({
                 "vin": "VIN is required."
+            })
+        vin_pattern = r"^[A-HJ-NPR-Z0-9]{17}$"
+
+        if not re.match(vin_pattern, vin):
+            raise serializers.ValidationError({
+                "vin": (
+                    "VIN must be exactly 17 characters and may contain only "
+                    "uppercase letters and numbers, excluding I, O, and Q."
+                )
             })
 
         checks = [

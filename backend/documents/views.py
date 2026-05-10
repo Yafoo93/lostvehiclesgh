@@ -1,13 +1,13 @@
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
-
 from rest_framework import generics, permissions
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import APIView
-
 from cases.models import Case
 from .models import Document
 from .serializers import DocumentSerializer
+from core.utils import log_activity
+from core.models import ActivityLog
 
 
 def check_document_case_permission(user, case: Case):
@@ -55,11 +55,21 @@ class CaseDocumentListCreateView(generics.ListCreateAPIView):
         self.check_case_permission(case)
 
         # For now, we always mark documents as private.
-        serializer.save(
+        document = serializer.save(
             case=case,
             is_private=True,
         )
 
+        log_activity(
+            user=self.request.user,
+            action=ActivityLog.ActionType.UPLOAD_DOCUMENT,
+            description=(
+                f"Uploaded document '{document.doc_type}' "
+                f"for Case #{case.id}."
+            ),
+            target=document,
+            request=self.request,
+        )
 
 class DocumentDownloadView(APIView):
     """
@@ -86,7 +96,18 @@ class DocumentDownloadView(APIView):
             content_type=document.content_type or "application/octet-stream",
             as_attachment=False,
             filename=filename,
-        )
+        )       
         response["X-Content-Type-Options"] = "nosniff"
         response["Cache-Control"] = "private, no-store"
+        
+        log_activity(
+            user=request.user,
+            action=ActivityLog.ActionType.DOWNLOAD_DOCUMENT,
+            description=(
+                f"Downloaded document '{document.doc_type}' "
+                f"for Case #{document.case.id}."
+            ),
+            target=document,
+            request=request,
+        )
         return response

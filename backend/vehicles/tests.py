@@ -18,7 +18,7 @@ class VehicleIdentifierConstraintTests(TestCase):
         data = {
             "owner": self.user,
             "plate_number": "GR-1234-24",
-            "vin": "VIN12345",
+            "vin": "WVWZZZ1JZXW000001",
             "engine_number": "ENG12345",
             "make": "Toyota",
             "model": "Corolla",
@@ -29,18 +29,18 @@ class VehicleIdentifierConstraintTests(TestCase):
     def test_vehicle_identifiers_are_normalized_on_save(self):
         vehicle = self.create_vehicle(
             plate_number=" gr-1234-24 ",
-            vin=" vin12345 ",
+            vin="WVWZZZ1JZXW000001",
             engine_number=" eng12345 ",
         )
 
         self.assertEqual(vehicle.plate_number, "GR-1234-24")
-        self.assertEqual(vehicle.vin, "VIN12345")
+        self.assertEqual(vehicle.vin, "WVWZZZ1JZXW000001")
         self.assertEqual(vehicle.engine_number, "ENG12345")
 
     def test_blank_optional_identifiers_are_stored_as_null(self):
         vehicle = self.create_vehicle(
             plate_number="",
-            vin="VIN55555",
+            vin="WVWZZZ1JZXW000001",
             engine_number="",
         )
 
@@ -52,7 +52,7 @@ class VehicleIdentifierConstraintTests(TestCase):
 
         vehicle = self.create_vehicle(
             plate_number="gr-1234-24",
-            vin="DIFFERENTVIN",
+            vin="JHMCM56557C404453",
             engine_number="DIFFERENTENG",
         )
 
@@ -74,7 +74,7 @@ class VehicleIdentifierConstraintTests(TestCase):
         with self.assertRaises(IntegrityError), transaction.atomic():
             self.create_vehicle(
                 plate_number="GT-3333-24",
-                vin="DIFFERENTVIN",
+                vin="JHMCM56557C404453",
                 engine_number="eng12345",
             )
 
@@ -89,12 +89,12 @@ class VehicleIdentifierConstraintTests(TestCase):
     def test_multiple_vehicles_can_omit_optional_plate_and_engine_numbers(self):
         self.create_vehicle(
             plate_number=None,
-            vin="VIN1000",
+            vin="JTDKB20U777123456",
             engine_number=None,
         )
         vehicle = self.create_vehicle(
             plate_number=None,
-            vin="VIN2000",
+            vin="JHMCM56557C404453",
             engine_number=None,
         )
 
@@ -113,7 +113,7 @@ class VehicleSerializerDeduplicationTests(APITestCase):
     def payload(self, **overrides):
         data = {
             "plate_number": "GR-1234-24",
-            "vin": "VIN12345",
+            "vin": "WVWZZZ1JZXW000001",
             "engine_number": "ENG12345",
             "make": "Toyota",
             "model": "Corolla",
@@ -131,7 +131,7 @@ class VehicleSerializerDeduplicationTests(APITestCase):
             self.url,
             self.payload(
                 plate_number="gr-1234-24",
-                vin="DIFFERENTVIN",
+                vin="JHMCM56557C404453",
                 engine_number="DIFFERENTENG",
             ),
             format="json",
@@ -147,7 +147,7 @@ class VehicleSerializerDeduplicationTests(APITestCase):
             self.url,
             self.payload(
                 plate_number="GT-2222-24",
-                vin="vin12345",
+                vin="WVWZZZ1JZXW000001",
                 engine_number="DIFFERENTENG",
             ),
             format="json",
@@ -169,14 +169,14 @@ class VehicleSerializerDeduplicationTests(APITestCase):
     def test_api_allows_multiple_missing_plate_and_engine_numbers(self):
         first = self.client.post(
             self.url,
-            self.payload(plate_number="", vin="VIN1000", engine_number=""),
+            self.payload(plate_number="", vin="WVWZZZ1JZXW000001", engine_number=""),
             format="json",
         )
         self.assertEqual(first.status_code, 201)
 
         response = self.client.post(
             self.url,
-            self.payload(plate_number="", vin="VIN2000", engine_number=""),
+            self.payload(plate_number="", vin="JHMCM56557C404453", engine_number=""),
             format="json",
         )
 

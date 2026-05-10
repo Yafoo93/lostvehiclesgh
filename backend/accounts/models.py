@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-
+from django.db.models.functions import Lower
+from django.db.models import Q
 
 class User(AbstractUser):
     class Roles(models.TextChoices):
@@ -44,3 +45,12 @@ class User(AbstractUser):
     @property
     def is_partner(self) -> bool:
         return self.role == self.Roles.PARTNER
+    
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                Lower("email"),
+                condition=~Q(email=""),
+                name="uniq_user_email_ci",
+            ),
+        ]

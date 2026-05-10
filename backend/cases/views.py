@@ -162,7 +162,7 @@ class CaseViewSet(viewsets.ModelViewSet):
           # 👇 LOG ACTIVITY
         log_activity(
             user=request.user,
-            action=ActivityLog.ActionType.CHANGE_CASE_STATUS,
+            action=ActivityLog.ActionType.VERIFY_STOLEN,
             description=f"Case status changed from {previous_status} to {case.status}.",
             target=case,
             request=request,
@@ -219,7 +219,7 @@ class CaseViewSet(viewsets.ModelViewSet):
 
         log_activity(
             user=request.user,
-            action=ActivityLog.ActionType.CHANGE_CASE_STATUS,
+            action=ActivityLog.ActionType.MARK_RECOVERED,
             description=(
                 f"Case status changed from {previous_status} to {case.status}. "
                 f"Recovery request had been submitted at {case.recovery_requested_at}."
@@ -263,6 +263,12 @@ class CaseViewSet(viewsets.ModelViewSet):
         case.recovery_reviewed_at = timezone.now()
         case.recovery_rejected_at = timezone.now()
         case.recovery_rejection_note = serializer.validated_data["recovery_rejection_note"]
+        case.recovery_requested_at = None
+        case.recovery_date = None
+        case.recovery_location = None
+        case.recovery_circumstances = None
+        case.recovery_vehicle_condition = None
+        case.recovery_additional_notes = ""
         case.moderated_by = request.user
         case.moderated_at = timezone.now()
         case.save(
@@ -270,6 +276,12 @@ class CaseViewSet(viewsets.ModelViewSet):
                 "recovery_reviewed_at",
                 "recovery_rejected_at",
                 "recovery_rejection_note",
+                "recovery_requested_at",
+                "recovery_date",
+                "recovery_location",
+                "recovery_circumstances",
+                "recovery_vehicle_condition",
+                "recovery_additional_notes",
                 "moderated_by",
                 "moderated_at",
                 "updated_at",
@@ -278,7 +290,7 @@ class CaseViewSet(viewsets.ModelViewSet):
 
         log_activity(
             user=request.user,
-            action=ActivityLog.ActionType.UPDATE_CASE,
+            action=ActivityLog.ActionType.REJECT_RECOVERY,
             description=(
                 f"Recovery request rejected for Case #{case.id}. "
                 f"Reason: {case.recovery_rejection_note}"
@@ -334,7 +346,7 @@ class CaseViewSet(viewsets.ModelViewSet):
         
         log_activity(
             user=request.user,
-            action=ActivityLog.ActionType.CHANGE_CASE_STATUS,
+            action=ActivityLog.ActionType.REJECT_CASE,
             description=(
                 f"Case status changed from {previous_status} to {case.status}. "
                 f"Reason: {case.rejection_reason}"
@@ -383,7 +395,7 @@ class CaseViewSet(viewsets.ModelViewSet):
 
         log_activity(
             user=request.user,
-            action=ActivityLog.ActionType.CHANGE_CASE_STATUS,
+            action=ActivityLog.ActionType.REQUEST_MORE_INFO,
             description=(
                 f"Case status changed from {previous_status} to {case.status}. "
                 f"Requested info: {case.more_info_request_note}"
@@ -420,7 +432,7 @@ class CaseViewSet(viewsets.ModelViewSet):
 
         log_activity(
             user=request.user,
-            action=ActivityLog.ActionType.UPDATE_CASE,
+            action=ActivityLog.ActionType.UPDATE_MODERATOR_NOTES,
             description=f"Moderator notes updated for Case #{case.id}.",
             target=case,
             request=request,
@@ -459,7 +471,7 @@ class CaseViewSet(viewsets.ModelViewSet):
 
         log_activity(
             user=request.user,
-            action=ActivityLog.ActionType.UPDATE_CASE,
+            action=ActivityLog.ActionType.FLAG_SUSPICIOUS,
             description=(
                 f"Suspicious/fraud flag set to {case.suspicious_flag} for Case #{case.id}. "
                 f"Reason: {case.suspicious_flag_reason}"
@@ -528,7 +540,7 @@ class CaseViewSet(viewsets.ModelViewSet):
 
         log_activity(
             user=request.user,
-            action=ActivityLog.ActionType.UPDATE_CASE,
+            action=ActivityLog.ActionType.REQUEST_RECOVERY,
             description=(
                 f"Recovery request submitted for Case #{case.id} "
                 f"with recovery date {case.recovery_date}."
@@ -606,35 +618,14 @@ class CaseViewSet(viewsets.ModelViewSet):
                 if update_fields:
                     sighting.save(update_fields=update_fields)
                 
-        #### Prepare notification payloads (for future use when we implement notifications)
-        owner_notification_payload = {
-            "case_id": case.id,
-            "sighting_id": sighting.id,
-            "vehicle": str(case.vehicle),
-            "location": sighting.location,
-            "message": sighting.message,
-            "contact_shared": contact_shared,
-        }
-
-        moderator_notification_payload = {
-            "case_id": case.id,
-            "sighting_id": sighting.id,
-            "status": case.status,
-            "reporter_name": sighting.reporter_name,
-            "reporter_phone": sighting.reporter_phone,
-            "reporter_email": sighting.reporter_email,
-            "location": sighting.location,
-        }
 
         # TODO: send owner notification via email/SMS/in-app
         # TODO: send moderator notification via email/SMS/in-app
-        
-        print("OWNER NOTIFICATION:", owner_notification_payload)
-        print("MODERATOR NOTIFICATION:", moderator_notification_payload)
+    
         
         log_activity(
             user=None,
-            action=ActivityLog.ActionType.UPDATE_CASE,
+            action=ActivityLog.ActionType.SUBMIT_SIGHTING,
             description=(
                 f"Sighting report #{sighting.id} submitted for Case #{case.id} "
                 f"at location '{sighting.location}'. Contact shared: {contact_shared}."
@@ -706,7 +697,7 @@ class CaseViewSet(viewsets.ModelViewSet):
 
         log_activity(
             user=None,
-            action=ActivityLog.ActionType.UPDATE_CASE,
+            action=ActivityLog.ActionType.REVEAL_CONTACT,
             description=(
                 f"Owner contact reveal requested for Case #{case.id} "
                 f"using SightingReport #{sighting.id}. Contact shared: {contact_shared}."
@@ -743,6 +734,17 @@ class CaseViewSet(viewsets.ModelViewSet):
         sightings = case.sightings.all().order_by("-created_at")
         serializer = SightingReportReadSerializer(sightings, many=True)
         return Response(serializer.data, status=drf_status.HTTP_200_OK)
+    
+    def perform_create(self, serializer):
+        case = serializer.save()
+
+        log_activity(
+            user=self.request.user,
+            action=ActivityLog.ActionType.CREATE_CASE,
+            description=f"Case #{case.id} created for vehicle {case.vehicle}.",
+            target=case,
+            request=self.request,
+        )
 
 class PublicVehicleStatusView(APIView):
     """
@@ -842,4 +844,15 @@ class PublicVehicleStatusView(APIView):
             "description": latest_case.description,
             "vehicle": latest_case.vehicle,
         })
+        log_activity(
+            user=None,
+            action=ActivityLog.ActionType.PUBLIC_SEARCH,
+            description=(
+                f"Public vehicle search performed. "
+                f"VIN provided: {bool(vin)}. "
+                f"Engine number provided: {bool(engine_number)}."
+            ),
+            target=None,
+            request=request,
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)

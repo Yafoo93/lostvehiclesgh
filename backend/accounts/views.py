@@ -1,3 +1,5 @@
+from urllib import request, response
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -13,6 +15,8 @@ from .serializers import (
     RegistrationSerializer,
     MyTokenObtainPairSerializer,
 )
+from core.utils import log_activity
+from core.models import ActivityLog
 
 
 User = get_user_model()
@@ -38,3 +42,22 @@ class LoginView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "login"
+    
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+
+        user_data = response.data.get("user", {})
+        user_id = user_data.get("id")
+
+        if user_id:
+            user = User.objects.filter(id=user_id).first()
+            if user:
+                log_activity(
+                    user=user,
+                    action=ActivityLog.ActionType.LOGIN,
+                    description=f"User {user.username} logged in.",
+                    target=user,
+                    request=request,
+                )
+
+        return response

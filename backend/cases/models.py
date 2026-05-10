@@ -5,6 +5,7 @@ from vehicles.models import Vehicle
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import timedelta
+from django.core.validators import MaxLengthValidator
 
 
 
@@ -57,6 +58,7 @@ class Case(models.Model):
     description = models.TextField(
         blank=True,
         null=True,
+        validators=[MaxLengthValidator(3000)],
         help_text="Additional details about the incident.",
     )
 
@@ -84,6 +86,7 @@ class Case(models.Model):
     recovery_circumstances = models.TextField(
         blank=True,
         null=True,
+        validators=[MaxLengthValidator(2000)],
         help_text="How the vehicle was recovered and the circumstances around it.",
     )
     recovery_vehicle_condition = models.TextField(
@@ -94,6 +97,7 @@ class Case(models.Model):
     recovery_additional_notes = models.TextField(
         blank=True,
         null=True,
+        validators=[MaxLengthValidator(3000)],
         help_text="Any other relevant recovery details provided by the owner.",
     )
 
@@ -110,17 +114,20 @@ class Case(models.Model):
     recovery_rejection_note = models.TextField(
         blank=True,
         null=True,
+        validators=[MaxLengthValidator(1000)],
         help_text="Reason provided by moderator/admin when rejecting a recovery request.",
     )
 
     rejection_reason = models.TextField(
         blank=True,
         null=True,
+        validators=[MaxLengthValidator(1000)],
         help_text="Reason provided by moderator/admin when rejecting the case.",
     )
     moderator_notes = models.TextField(
         blank=True,
         null=True,
+        validators=[MaxLengthValidator(1000)],
         help_text="Internal notes visible to moderators/admins only.",
     )
     more_info_requested_at = models.DateTimeField(
@@ -131,6 +138,7 @@ class Case(models.Model):
     more_info_request_note = models.TextField(
         blank=True,
         null=True,
+        validators=[MaxLengthValidator(1000)],
         help_text="Message explaining what additional information is needed.",
     )
     suspicious_flag = models.BooleanField(
@@ -141,6 +149,7 @@ class Case(models.Model):
     suspicious_flag_reason = models.TextField(
         blank=True,
         null=True,
+        validators=[MaxLengthValidator(1000)],
         help_text="Reason this case was flagged as suspicious/fraudulent.",
     )
     moderated_by = models.ForeignKey(
@@ -179,7 +188,9 @@ class SightingReport(models.Model):
     reporter_name = models.CharField(max_length=255, blank=True)
     reporter_phone = models.CharField(max_length=50, blank=True)
     reporter_email = models.EmailField(blank=True)
-    message = models.TextField()
+    message = models.TextField(
+        validators=[MaxLengthValidator(2000)],
+    )
     location = models.CharField(max_length=255)
     contact_revealed = models.BooleanField(default=False)
     contact_revealed_at = models.DateTimeField(null=True, blank=True)

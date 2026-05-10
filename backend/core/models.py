@@ -18,6 +18,18 @@ class ActivityLog(models.Model):
         UPDATE_CASE = "UPDATE_CASE", "Update Case"
         CHANGE_CASE_STATUS = "CHANGE_CASE_STATUS", "Change Case Status"
         UPLOAD_DOCUMENT = "UPLOAD_DOCUMENT", "Upload Document"
+        DOWNLOAD_DOCUMENT = "DOWNLOAD_DOCUMENT", "Download Document"
+        REVEAL_CONTACT = "REVEAL_CONTACT", "Reveal Contact"
+        SUBMIT_SIGHTING = "SUBMIT_SIGHTING", "Submit Sighting"
+        REQUEST_RECOVERY = "REQUEST_RECOVERY", "Request Recovery"
+        REJECT_RECOVERY = "REJECT_RECOVERY", "Reject Recovery"
+        FLAG_SUSPICIOUS = "FLAG_SUSPICIOUS", "Flag Suspicious"
+        UPDATE_MODERATOR_NOTES = "UPDATE_MODERATOR_NOTES", "Update Moderator Notes"
+        REQUEST_MORE_INFO = "REQUEST_MORE_INFO", "Request More Info"
+        REJECT_CASE = "REJECT_CASE", "Reject Case"
+        VERIFY_STOLEN = "VERIFY_STOLEN", "Verify Stolen"
+        MARK_RECOVERED = "MARK_RECOVERED", "Mark Recovered"
+        PUBLIC_SEARCH = "PUBLIC_SEARCH", "Public Search"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -74,6 +86,11 @@ class ActivityLog(models.Model):
         ordering = ["-created_at"]
         verbose_name = "Activity Log"
         verbose_name_plural = "Activity Logs"
+        indexes = [
+            models.Index(fields=["action"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["target_app_label", "target_model", "target_object_id"]),
+        ]
 
     def __str__(self) -> str:
         user_str = self.user.username if self.user else "System"
