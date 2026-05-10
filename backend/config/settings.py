@@ -166,6 +166,7 @@ REST_FRAMEWORK = {
         "report_sighting": "10/min",
         "reveal_contact": "5/min",
         "password_reset": "5/hour",
+        "email_verification": "5/hour",
     },
 }
 

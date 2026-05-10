@@ -22,6 +22,8 @@ class UserSerializer(serializers.ModelSerializer):
             "last_name",
             "phone",
             "role",
+            "email_verified",
+            "email_verified_at",
         ]
         read_only_fields = ["id", "role"]  # role is controlled by admins/moderators
 
@@ -152,3 +154,23 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         user.set_password(self.validated_data["new_password"])
         user.save(update_fields=["password"])
         return user
+    
+class EmailVerificationRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField() 
+    
+class EmailVerificationConfirmSerializer(serializers.Serializer):
+    uid = serializers.CharField()
+    token = serializers.CharField()
+
+    def validate(self, attrs):
+        try:
+            uid = force_str(urlsafe_base64_decode(attrs["uid"]))
+            user = User.objects.get(pk=uid)
+        except Exception:
+            raise serializers.ValidationError({"uid": "Invalid verification link."})
+
+        if not default_token_generator.check_token(user, attrs["token"]):
+            raise serializers.ValidationError({"token": "Invalid or expired verification token."})
+
+        attrs["user"] = user
+        return attrs

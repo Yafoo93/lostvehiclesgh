@@ -1,5 +1,3 @@
-from urllib import request, response
-
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -16,14 +14,18 @@ from .serializers import (
     MyTokenObtainPairSerializer,
     PasswordResetRequestSerializer,
     PasswordResetConfirmSerializer,
+    EmailVerificationRequestSerializer,
+    EmailVerificationConfirmSerializer,
 )
 from core.utils import log_activity
 from core.models import ActivityLog
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import send_mail
+from core.notifications import send_email_notification
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
+from django.utils import timezone
+
 
 
 User = get_user_model()
@@ -43,6 +45,24 @@ class RegistrationView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegistrationSerializer
     permission_classes = [AllowAny]
+    
+    def perform_create(self, serializer):
+        user = serializer.save()
+
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        verify_url = f"{settings.FRONTEND_URL}/verify-email?uid={uid}&token={token}"
+
+        send_email_notification(
+            subject="Verify your LostVehiclesGH email",
+            message=(
+                "Welcome to LostVehiclesGH.\n\n"
+                "Please verify your email address using the link below:\n"
+                f"{verify_url}\n\n"
+                "If you did not create this account, you can ignore this email."
+            ),
+            recipient_list=[user.email],
+        )
 
 class LoginView(TokenObtainPairView):
     permission_classes = [AllowAny]
@@ -97,16 +117,14 @@ class PasswordResetRequestView(generics.GenericAPIView):
             token = default_token_generator.make_token(user)
             reset_url = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
 
-            send_mail(
+            send_email_notification(
                 subject="Reset your LostVehiclesGH password",
                 message=(
                     "You requested a password reset for your LostVehiclesGH account.\n\n"
                     f"Use this link to reset your password:\n{reset_url}\n\n"
                     "If you did not request this, you can ignore this email."
                 ),
-                from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[user.email],
-                fail_silently=False,
             )
 
         return Response(
@@ -136,5 +154,72 @@ class PasswordResetConfirmView(generics.GenericAPIView):
 
         return Response(
             {"detail": "Password has been reset successfully."},
+            status=status.HTTP_200_OK,
+        )
+    
+class EmailVerificationRequestView(generics.GenericAPIView):
+    serializer_class = EmailVerificationRequestSerializer
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "email_verification"
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"].strip().lower()
+        user = User.objects.filter(email__iexact=email).first()
+
+        if user and not user.email_verified:
+            log_activity(
+                user=user,
+                action=ActivityLog.ActionType.EMAIL_VERIFICATION_REQUEST,
+                description=f"Email verification requested for user {user.username}.",
+                target=user,
+                request=request,
+            )
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            verify_url = f"{settings.FRONTEND_URL}/verify-email?uid={uid}&token={token}"
+
+            send_email_notification(
+                subject="Verify your LostVehiclesGH email",
+                message=(
+                    "Please verify your LostVehiclesGH email address.\n\n"
+                    f"Use this link to verify your email:\n{verify_url}\n\n"
+                    "If you did not create this account, you can ignore this email."
+                ),
+                recipient_list=[user.email],
+            )
+
+        return Response(
+            {"detail": "If an account exists with this email, a verification link has been sent."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class EmailVerificationConfirmView(generics.GenericAPIView):
+    serializer_class = EmailVerificationConfirmSerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.validated_data["user"]
+        user.email_verified = True
+        user.email_verified_at = timezone.now()
+        user.save(update_fields=["email_verified", "email_verified_at"])
+
+        log_activity(
+            user=user,
+            action=ActivityLog.ActionType.EMAIL_VERIFIED,
+            description=f"Email verified for user {user.username}.",
+            target=user,
+            request=request,
+        )
+
+        return Response(
+            {"detail": "Email verified successfully."},
             status=status.HTTP_200_OK,
         )

@@ -24,6 +24,16 @@ class User(AbstractUser):
         null=True,
         unique=False,  # we'll handle uniqueness/format later
     )
+    
+    email_verified = models.BooleanField(
+        default=False,
+        db_index=True,
+    )
+
+    email_verified_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
 
     def __str__(self) -> str:
         return f"{self.username} ({self.role})"
@@ -54,3 +64,4 @@ class User(AbstractUser):
                 name="uniq_user_email_ci",
             ),
         ]
+    

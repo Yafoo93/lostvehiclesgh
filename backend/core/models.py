@@ -32,6 +32,8 @@ class ActivityLog(models.Model):
         PUBLIC_SEARCH = "PUBLIC_SEARCH", "Public Search"
         PASSWORD_RESET = "PASSWORD_RESET", "Password Reset"
         PASSWORD_RESET_REQUEST = "PASSWORD_RESET_REQUEST", "Password Reset Request"
+        EMAIL_VERIFICATION_REQUEST = "EMAIL_VERIFICATION_REQUEST", "Email Verification Request"
+        EMAIL_VERIFIED = "EMAIL_VERIFIED", "Email Verified"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
